@@ -17,55 +17,34 @@ const COMPLIANCE_RULES = [
   { id: "LM-010", declaration: "FSSAI License", field: "fssaiLicense", severity: "high" as const, requirement: "FSSAI license number for food products" },
 ];
 
-const EXTRACTION_PROMPT = `You are an expert Legal Metrology compliance AI for Indian product labels.
-Analyze this product label image and extract ALL visible text and information.
+const EXTRACTION_PROMPT = `Analyze this Indian product label image for Legal Metrology compliance.
 
-For each field, provide:
-- The exact text you see on the label
-- Your confidence level (0-100) that you correctly read this text
-- A bounding box estimate as percentage of image dimensions: { x: %, y: %, width: %, height: % }
-
-Extract these specific fields:
-1. productName - Product name/title
-2. manufacturer - Manufacturer name and address
-3. netQuantity - Net quantity with unit (e.g., "500 g", "1 L")
-4. mrp - Maximum Retail Price with ₹ symbol
-5. consumerCare - Consumer care contact (phone/email/address)
-6. manufacturingDate - Manufacturing or packing date
-7. expiryDate - Expiry or "use before" date
-8. countryOfOrigin - Country of origin
-9. batchNumber - Batch or lot number
-10. vegNonVeg - Vegetarian/non-vegetarian mark (green dot = veg, brown dot = non-veg)
-11. fssaiLicense - FSSAI license number (for food products)
-12. additionalInfo - Any other mandatory declarations found
-
-Respond ONLY with valid JSON matching this exact structure:
+Extract these fields as JSON (use "" and 0 if not found):
 {
   "fields": {
-    "productName": { "value": "string", "confidence": 0-100, "boundingBox": { "x": 0-100, "y": 0-100, "width": 0-100, "height": 0-100 } },
-    "manufacturer": { "value": "string", "confidence": 0-100, "boundingBox": { "x": 0-100, "y": 0-100, "width": 0-100, "height": 0-100 } },
-    "netQuantity": { "value": "string", "confidence": 0-100, "boundingBox": { "x": 0-100, "y": 0-100, "width": 0-100, "height": 0-100 } },
-    "mrp": { "value": "string", "confidence": 0-100, "boundingBox": { "x": 0-100, "y": 0-100, "width": 0-100, "height": 0-100 } },
-    "consumerCare": { "value": "string", "confidence": 0-100, "boundingBox": null },
-    "manufacturingDate": { "value": "string", "confidence": 0-100, "boundingBox": null },
-    "expiryDate": { "value": "string", "confidence": 0-100, "boundingBox": null },
-    "countryOfOrigin": { "value": "string", "confidence": 0-100, "boundingBox": null },
-    "batchNumber": { "value": "string", "confidence": 0-100, "boundingBox": null },
-    "vegNonVeg": { "value": "string", "confidence": 0-100, "boundingBox": null },
-    "fssaiLicense": { "value": "string", "confidence": 0-100, "boundingBox": null },
-    "additionalInfo": { "value": "string", "confidence": 0-100, "boundingBox": null }
+    "productName": {"value":"","confidence":0,"boundingBox":{"x":0,"y":0,"width":0,"height":0}},
+    "manufacturer": {"value":"","confidence":0,"boundingBox":{"x":0,"y":0,"width":0,"height":0}},
+    "netQuantity": {"value":"","confidence":0,"boundingBox":{"x":0,"y":0,"width":0,"height":0}},
+    "mrp": {"value":"","confidence":0,"boundingBox":{"x":0,"y":0,"width":0,"height":0}},
+    "consumerCare": {"value":"","confidence":0,"boundingBox":null},
+    "manufacturingDate": {"value":"","confidence":0,"boundingBox":null},
+    "expiryDate": {"value":"","confidence":0,"boundingBox":null},
+    "countryOfOrigin": {"value":"","confidence":0,"boundingBox":null},
+    "batchNumber": {"value":"","confidence":0,"boundingBox":null},
+    "vegNonVeg": {"value":"","confidence":0,"boundingBox":null},
+    "fssaiLicense": {"value":"","confidence":0,"boundingBox":null},
+    "additionalInfo": {"value":"","confidence":0,"boundingBox":null}
   },
-  "rawText": "Complete raw text detected on the label",
+  "rawText": "all text on label",
   "imageQuality": "good|fair|poor"
 }
 
-Rules for extraction:
-- If a field is not visible, set value to "" and confidence to 0
-- Be precise with the text you extract - do not paraphrase
-- For MRP, include the ₹ symbol if visible
-- For dates, preserve the exact format shown
-- For bounding boxes, estimate the position as percentage of total image dimensions
-- Include ALL text you can read, even if unsure about categorization`;
+Rules:
+- Extract EXACT text, do not paraphrase
+- Include ₹ symbol for MRP
+- Preserve date formats exactly
+- Bounding boxes as % of image (0-100)
+- Respond ONLY with valid JSON, no markdown`;
 
 interface ExtractedFieldValue {
   value: string;

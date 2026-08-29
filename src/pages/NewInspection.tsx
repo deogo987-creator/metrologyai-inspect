@@ -1,10 +1,11 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { generateInspectionId } from "@/lib/demo-data";
+import { compressImage } from "@/lib/optimize";
 import type { ProductInfo, ComplianceResult, ExtractedField, InspectionStatus } from "@/lib/types";
 import {
   Upload,
@@ -43,18 +44,8 @@ const steps = [
   { num: 3, label: "AI Inspection" },
 ];
 
-// Convert a File to base64 data URL
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// Stored image files (keyed by blob URL → base64)
-const imageStore = new Map<string, string>();
+// Compressed image cache (blob URL → compressed base64)
+const compressedCache = new Map<string, string>();
 
 export default function NewInspection() {
   const navigate = useNavigate();
@@ -94,9 +85,10 @@ export default function NewInspection() {
         newFiles.push(file);
         const preview = URL.createObjectURL(file);
         newPreviews.push(preview);
-        // Store base64 for later use
-        const base64 = await fileToBase64(file);
-        imageStore.set(preview, base64);
+        // Compress image in background for faster API call
+        compressImage(file).then((compressed) => {
+          compressedCache.set(preview, compressed);
+        });
       }
     }
 
@@ -110,7 +102,7 @@ export default function NewInspection() {
       const url = prev[index];
       if (url) {
         URL.revokeObjectURL(url);
-        imageStore.delete(url);
+        compressedCache.delete(url);
       }
       return prev.filter((_, i) => i !== index);
     });
@@ -141,8 +133,12 @@ export default function NewInspection() {
     }, 600);
 
     try {
-      // Use the first image for analysis
-      const base64 = imageStore.get(imagePreviews[0]);
+      // Use compressed image for analysis
+      let base64 = compressedCache.get(imagePreviews[0]);
+      if (!base64) {
+        // Fallback: compress on the fly if cache miss
+        base64 = await compressImage(imageFiles[0]);
+      }
       if (!base64) {
         throw new Error("Image data not found. Please re-upload the image.");
       }
@@ -218,7 +214,7 @@ export default function NewInspection() {
     setEditingId(null);
   };
 
-  const resetInspection = () => {
+  const resetInspection = useCallback(() => {
     setStep(1);
     setResult(null);
     setImageFiles([]);
@@ -227,9 +223,9 @@ export default function NewInspection() {
     setRawOcrText("");
     setError(null);
     inspectionId.current = generateInspectionId();
-  };
+  }, []);
 
-  const canProceedStep1 = productInfo.productName.trim() !== "";
+  const canProceedStep1 = useMemo(() => productInfo.productName.trim() !== "", [productInfo.productName]);
   const canProceedStep2 = imageFiles.length > 0;
 
   return (
