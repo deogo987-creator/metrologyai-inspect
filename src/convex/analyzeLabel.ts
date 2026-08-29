@@ -357,12 +357,38 @@ export const analyzeLabel = action({
       }
       extraction = JSON.parse(cleaned.trim());
     } catch {
-      // Last resort: try to reconstruct a basic extraction from raw text
       extraction = {
         fields: {},
         rawText: responseText.substring(0, 2000),
         imageQuality: "unknown",
       };
+    }
+
+    // Normalize field names — Gemini may return different keys
+    if (extraction.fields) {
+      const fieldMap: Record<string, string> = {
+        product_name: "productName", productname: "productName", "product name": "productName",
+        manufacturer_name: "manufacturer", manufacturername: "manufacturer", "manufacturer name": "manufacturer",
+        net_quantity: "netQuantity", netquantity: "netQuantity", "net quantity": "netQuantity", quantity: "netQuantity",
+        mrp_price: "mrp", "mrp price": "mrp", price: "mrp", "maximum retail price": "mrp",
+        consumer_care: "consumerCare", consumercare: "consumerCare", "consumer care": "consumerCare", contact: "consumerCare",
+        manufacturing_date: "manufacturingDate", manufacturingdate: "manufacturingDate", "manufacturing date": "manufacturingDate", "packed date": "manufacturingDate",
+        expiry_date: "expiryDate", expirydate: "expiryDate", "expiry date": "expiryDate", "use before": "expiryDate",
+        country_of_origin: "countryOfOrigin", countryoforigin: "countryOfOrigin", "country of origin": "countryOfOrigin", origin: "countryOfOrigin",
+        batch_number: "batchNumber", batchnumber: "batchNumber", "batch number": "batchNumber", lot: "batchNumber",
+        veg_non_veg: "vegNonVeg", vegnonveg: "vegNonVeg", "veg non veg": "vegNonVeg", vegetarian: "vegNonVeg",
+        fssai: "fssaiLicense", "fssai number": "fssaiLicense", license: "fssaiLicense",
+      };
+      const normalized: Record<string, ExtractedFieldValue> = {};
+      for (const [key, val] of Object.entries(extraction.fields)) {
+        const normalizedKey = fieldMap[key.toLowerCase().replace(/[^a-z0-9]/g, "")] || fieldMap[key.toLowerCase()] || key;
+        const existing = normalized[normalizedKey];
+        // Keep the one with higher confidence
+        if (!existing || (val && typeof val === "object" && (val.confidence || 0) > (existing.confidence || 0))) {
+          normalized[normalizedKey] = val as ExtractedFieldValue;
+        }
+      }
+      extraction.fields = normalized;
     }
 
     // Run compliance evaluation
