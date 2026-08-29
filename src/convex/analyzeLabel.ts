@@ -97,6 +97,67 @@ interface ComplianceAnalysisResult {
   mode: "live";
 }
 
+// Direct REST API call to Gemini — more reliable than SDK
+async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: string): Promise<string> {
+  // Try multiple models in order
+  const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+  let lastError = "";
+
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const body = {
+      contents: [{
+        parts: [
+          { text: EXTRACTION_PROMPT },
+          {
+            inlineData: {
+              mimeType,
+              data: imageBase64,
+            },
+          },
+        ],
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json",
+      },
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        lastError = `${model}: HTTP ${response.status} - ${errorText.substring(0, 200)}`;
+        continue; // Try next model
+      }
+
+      const data = await response.json() as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        lastError = `${model}: No text in response`;
+        continue;
+      }
+
+      return text;
+    } catch (err) {
+      lastError = `${model}: ${err instanceof Error ? err.message : String(err)}`;
+      continue;
+    }
+  }
+
+  throw new Error(`All Gemini models failed. Last error: ${lastError}`);
+}
+
 function evaluateField(
   fieldName: string,
   ruleId: string,
@@ -109,27 +170,20 @@ function evaluateField(
   let status: "compliant" | "review-required" | "non-compliant";
   if (!hasValue || confidence === 0) {
     status = "non-compliant";
-  } else if (confidence < 70) {
-    status = "review-required";
   } else if (confidence < 85) {
     status = "review-required";
   } else {
     status = "compliant";
   }
 
-  // Format-specific checks
   if (fieldName === "mrp" && hasValue) {
     const hasRupee = extracted.value.includes("₹") || extracted.value.includes("Rs") || extracted.value.includes("INR");
-    if (!hasRupee) {
-      status = "review-required";
-    }
+    if (!hasRupee) status = "review-required";
   }
 
   if ((fieldName === "manufacturingDate" || fieldName === "expiryDate") && hasValue) {
     const datePattern = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{1,2}\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*\d{2,4}/i;
-    if (!datePattern.test(extracted.value)) {
-      status = "review-required";
-    }
+    if (!datePattern.test(extracted.value)) status = "review-required";
   }
 
   const field: FieldStatus = {
@@ -205,41 +259,28 @@ function calculateCompliance(fields: FieldStatus[], violations: ViolationData[])
   for (const field of fields) {
     const mapping = fieldWeights[field.fieldName];
     if (!mapping) continue;
-
     const cat = categoryScores.find((c) => c.name === mapping.category);
     if (!cat) continue;
-
     let points = 0;
-    if (field.status === "compliant") {
-      points = mapping.weight;
-    } else if (field.status === "review-required") {
-      points = Math.round(mapping.weight * (field.confidence / 100) * 0.7);
-    }
-
+    if (field.status === "compliant") points = mapping.weight;
+    else if (field.status === "review-required") points = Math.round(mapping.weight * (field.confidence / 100) * 0.7);
     cat.score += points;
   }
 
   const avgConfidence = fields.reduce((sum, f) => sum + f.confidence, 0) / fields.length;
   const ocrCat = categoryScores.find((c) => c.name === "OCR Confidence");
-  if (ocrCat) {
-    ocrCat.score = Math.round((avgConfidence / 100) * ocrCat.maxScore);
-  }
+  if (ocrCat) ocrCat.score = Math.round((avgConfidence / 100) * ocrCat.maxScore);
 
   const totalScore = categoryScores.reduce((sum, c) => sum + c.score, 0);
   const maxTotal = categoryScores.reduce((sum, c) => sum + c.maxScore, 0);
   const score = Math.round((totalScore / maxTotal) * 100);
 
-  const highViolations = violations.filter((v) => v.severity === "high" && v.title.includes("Missing"));
-  const hasMissingFields = highViolations.length > 0;
+  const hasMissingFields = violations.filter((v) => v.severity === "high" && v.title.includes("Missing")).length > 0;
 
   let status: "compliant" | "review-required" | "non-compliant";
-  if (score >= 85 && !hasMissingFields) {
-    status = "compliant";
-  } else if (hasMissingFields || score < 50) {
-    status = "non-compliant";
-  } else {
-    status = "review-required";
-  }
+  if (score >= 85 && !hasMissingFields) status = "compliant";
+  else if (hasMissingFields || score < 50) status = "non-compliant";
+  else status = "review-required";
 
   const missingFields = fields.filter((f) => f.status === "non-compliant").map((f) => f.fieldName);
   const lowConfFields = fields.filter((f) => f.status === "review-required").map((f) => f.fieldName);
@@ -278,11 +319,6 @@ export const analyzeLabel = action({
       throw new Error("GEMINI_API_KEY is not configured. Please add it in the project's Keys/API keys settings.");
     }
 
-    const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    const genAI = new GoogleGenerativeAI(apiKey);
-
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-
     // Extract base64 data and mime type from the data URL
     let imageData = args.imageBase64;
     let mimeType = "image/jpeg";
@@ -295,33 +331,12 @@ export const analyzeLabel = action({
       }
     }
 
-    const imagePart = {
-      inlineData: {
-        data: imageData,
-        mimeType,
-      },
-    };
+    // Call Gemini via direct REST API
+    const responseText = await callGeminiVision(apiKey, imageData, mimeType);
 
-    let result;
-    try {
-      result = await model.generateContent([EXTRACTION_PROMPT, imagePart]);
-    } catch (apiError: unknown) {
-      const msg = apiError instanceof Error ? apiError.message : String(apiError);
-      if (msg.includes("API_KEY_INVALID") || msg.includes("api key not valid")) {
-        throw new Error("Invalid Gemini API key. Please verify your GEMINI_API_KEY in the Convex dashboard.");
-      }
-      if (msg.includes("fetch failed") || msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT")) {
-        throw new Error("Network error connecting to Gemini API. Check your network and try again.");
-      }
-      throw new Error(`Gemini API error: ${msg}`);
-    }
-
-    const responseText = result.response.text();
-
-    // Parse JSON from response — handle markdown code blocks
+    // Parse JSON from response
     let extraction: ExtractionResult;
     try {
-      // Strip markdown code fences if present
       const cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
       extraction = JSON.parse(cleaned);
     } catch {
@@ -336,9 +351,7 @@ export const analyzeLabel = action({
       const extractedField = extraction.fields[rule.field] || { value: "", confidence: 0, boundingBox: null };
       const { field, violation } = evaluateField(rule.field, rule.id, extractedField, rule.requirement);
       fieldResults.push(field);
-      if (violation) {
-        allViolations.push(violation);
-      }
+      if (violation) allViolations.push(violation);
     }
 
     const { score, status, categories, explanation } = calculateCompliance(fieldResults, allViolations);
