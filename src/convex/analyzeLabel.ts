@@ -303,7 +303,20 @@ export const analyzeLabel = action({
       },
     };
 
-    const result = await model.generateContent([EXTRACTION_PROMPT, imagePart]);
+    let result;
+    try {
+      result = await model.generateContent([EXTRACTION_PROMPT, imagePart]);
+    } catch (apiError: unknown) {
+      const msg = apiError instanceof Error ? apiError.message : String(apiError);
+      if (msg.includes("API_KEY_INVALID") || msg.includes("api key not valid")) {
+        throw new Error("Invalid Gemini API key. Please verify your GEMINI_API_KEY in the Convex dashboard.");
+      }
+      if (msg.includes("fetch failed") || msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT")) {
+        throw new Error("Network error connecting to Gemini API. Check your network and try again.");
+      }
+      throw new Error(`Gemini API error: ${msg}`);
+    }
+
     const responseText = result.response.text();
 
     // Parse JSON from response — handle markdown code blocks
