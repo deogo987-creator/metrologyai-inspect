@@ -3,43 +3,65 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 
-// Compliance rules for Legal Metrology
-const COMPLIANCE_RULES = [
-  { id: "LM-001", declaration: "Product Identity", field: "productName", severity: "high" as const, requirement: "Product name must be clearly declared on the label" },
-  { id: "LM-002", declaration: "Manufacturer Details", field: "manufacturer", severity: "high" as const, requirement: "Name and address of manufacturer/prepacker/importer must be declared" },
-  { id: "LM-003", declaration: "Net Quantity", field: "netQuantity", severity: "high" as const, requirement: "Net quantity must be declared in standard SI units" },
-  { id: "LM-004", declaration: "MRP Declaration", field: "mrp", severity: "high" as const, requirement: "Maximum Retail Price must be declared in ₹ with tax inclusion" },
-  { id: "LM-005", declaration: "Consumer Care Details", field: "consumerCare", severity: "high" as const, requirement: "Consumer care contact information (phone/email) must be present" },
-  { id: "LM-006", declaration: "Date Declaration", field: "manufacturingDate", severity: "high" as const, requirement: "Manufacturing/packing date and expiry/use-before date must be declared" },
-  { id: "LM-007", declaration: "Country of Origin", field: "countryOfOrigin", severity: "medium" as const, requirement: "Country of origin must be declared on the package" },
-  { id: "LM-008", declaration: "Batch/Lot Number", field: "batchNumber", severity: "medium" as const, requirement: "Batch or lot number must be clearly marked" },
-  { id: "LM-009", declaration: "Vegetarian/Non-Veg Mark", field: "vegNonVeg", severity: "medium" as const, requirement: "Mandatory vegetarian/non-vegetarian declaration symbol" },
-  { id: "LM-010", declaration: "FSSAI License", field: "fssaiLicense", severity: "high" as const, requirement: "FSSAI license number for food products" },
-];
+const EXTRACTION_PROMPT = `You are an expert Legal Metrology compliance inspector for India. 
+Analyze this product label image and perform TWO tasks:
 
-const EXTRACTION_PROMPT = `Analyze this Indian product label image for Legal Metrology compliance.
+TASK 1: Extract all visible text and identify these mandatory declaration fields:
+- productName: Product name/title
+- manufacturer: Manufacturer/prepacker/importer name and address
+- netQuantity: Net quantity with unit (e.g., "500 g", "1 L")
+- mrp: Maximum Retail Price (must include ₹ symbol and "(Inclusive of all taxes)" or similar)
+- consumerCare: Consumer care contact (phone/email/address)
+- manufacturingDate: Manufacturing or packing date
+- expiryDate: Expiry or "use before" date
+- countryOfOrigin: Country of origin
+- batchNumber: Batch or lot number
+- vegNonVeg: Vegetarian/non-vegetarian mark
+- fssaiLicense: FSSAI license number (required for food products)
 
-Extract these fields as JSON (use "" and 0 if not found):
+TASK 2: For EACH field, verify compliance against these Legal Metrology rules:
+1. Product name must be clearly visible and unambiguous
+2. Manufacturer must include full name AND address (not just name)
+3. Net quantity must use SI units (g, kg, ml, L) — not vague terms
+4. MRP MUST include ₹ symbol AND "(Inclusive of all taxes)" text — missing either is a violation
+5. Consumer care must include at least a phone number or email — missing entirely is HIGH severity
+6. Manufacturing date must be in DD/MM/YYYY or MMM/YYYY format
+7. Expiry date must be present for perishable goods
+8. Country of origin must say "Made in India" or "Country of Origin: India" or similar
+9. Batch number must be alphanumeric
+10. For food products: FSSAI license number must be present (14-digit number)
+11. Veg/Non-veg mark must be present (green dot = veg, brown dot = non-veg)
+
+For each field, provide:
+- value: the exact extracted text (or "" if not found)
+- confidence: 0-100
+- boundingBox: {x, y, width, height} as percentage of image (or null)
+- complianceStatus: "compliant" | "violation" | "warning"
+- complianceReason: specific explanation of why it complies or violates
+- ruleId: the rule number (1-11) that applies
+
+Respond with ONLY valid JSON:
 {
   "fields": {
-    "productName": {"value":"","confidence":0,"boundingBox":{"x":0,"y":0,"width":0,"height":0}},
-    "manufacturer": {"value":"","confidence":0,"boundingBox":{"x":0,"y":0,"width":0,"height":0}},
-    "netQuantity": {"value":"","confidence":0,"boundingBox":{"x":0,"y":0,"width":0,"height":0}},
-    "mrp": {"value":"","confidence":0,"boundingBox":{"x":0,"y":0,"width":0,"height":0}},
-    "consumerCare": {"value":"","confidence":0,"boundingBox":null},
-    "manufacturingDate": {"value":"","confidence":0,"boundingBox":null},
-    "expiryDate": {"value":"","confidence":0,"boundingBox":null},
-    "countryOfOrigin": {"value":"","confidence":0,"boundingBox":null},
-    "batchNumber": {"value":"","confidence":0,"boundingBox":null},
-    "vegNonVeg": {"value":"","confidence":0,"boundingBox":null},
-    "fssaiLicense": {"value":"","confidence":0,"boundingBox":null},
-    "additionalInfo": {"value":"","confidence":0,"boundingBox":null}
+    "productName": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":1},
+    "manufacturer": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":2},
+    "netQuantity": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":3},
+    "mrp": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":4},
+    "consumerCare": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":5},
+    "manufacturingDate": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":6},
+    "expiryDate": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":7},
+    "countryOfOrigin": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":8},
+    "batchNumber": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":9},
+    "vegNonVeg": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":10},
+    "fssaiLicense": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":"","ruleId":11}
   },
-  "rawText": "all text on label",
-  "imageQuality": "good|fair|poor"
+  "rawText": "all visible text on label",
+  "imageQuality": "good|fair|poor",
+  "isFoodProduct": true|false,
+  "overallAssessment": "brief summary of compliance status"
 }
 
-Rules:
+Rules for extraction:
 - Extract EXACT text, do not paraphrase
 - Include ₹ symbol for MRP
 - Preserve date formats exactly
@@ -50,12 +72,17 @@ interface ExtractedFieldValue {
   value: string;
   confidence: number;
   boundingBox: { x: number; y: number; width: number; height: number } | null;
+  complianceStatus: string;
+  complianceReason: string;
+  ruleId: number;
 }
 
 interface ExtractionResult {
   fields: Record<string, ExtractedFieldValue>;
   rawText: string;
   imageQuality: string;
+  isFoodProduct: boolean;
+  overallAssessment: string;
 }
 
 interface FieldStatus {
@@ -65,6 +92,7 @@ interface FieldStatus {
   confidence: number;
   status: "compliant" | "review-required" | "non-compliant";
   boundingBox?: { x: number; y: number; width: number; height: number };
+  complianceReason: string;
 }
 
 interface ViolationData {
@@ -97,43 +125,36 @@ interface ComplianceAnalysisResult {
   mode: "live";
 }
 
-// Direct REST API call to Gemini — more reliable than SDK
+const RULE_REQUIREMENTS: Record<number, { declaration: string; requirement: string; severity: "high" | "medium" | "low" }> = {
+  1: { declaration: "Product Identity", requirement: "Product name must be clearly visible and unambiguous", severity: "high" },
+  2: { declaration: "Manufacturer Details", requirement: "Must include full name AND complete address", severity: "high" },
+  3: { declaration: "Net Quantity", requirement: "Must use SI units (g, kg, ml, L)", severity: "high" },
+  4: { declaration: "MRP Declaration", requirement: "Must include ₹ symbol AND '(Inclusive of all taxes)' text", severity: "high" },
+  5: { declaration: "Consumer Care Details", requirement: "Must include phone number or email address", severity: "high" },
+  6: { declaration: "Date Declaration", requirement: "Must be in DD/MM/YYYY or MMM/YYYY format", severity: "high" },
+  7: { declaration: "Expiry Date", requirement: "Required for perishable products", severity: "high" },
+  8: { declaration: "Country of Origin", requirement: "Must clearly state country of origin", severity: "medium" },
+  9: { declaration: "Batch/Lot Number", requirement: "Must be alphanumeric batch identifier", severity: "medium" },
+  10: { declaration: "Veg/Non-Veg Mark", requirement: "Must have green (veg) or brown (non-veg) dot symbol", severity: "medium" },
+  11: { declaration: "FSSAI License", requirement: "Required for food products — 14-digit license number", severity: "high" },
+};
+
 async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: string): Promise<string> {
-  // Try multiple models in order
   const models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash"];
   let lastError = "";
 
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
     const body = {
-      contents: [{
-        parts: [
-          { text: EXTRACTION_PROMPT },
-          {
-            inlineData: {
-              mimeType,
-              data: imageBase64,
-            },
-          },
-        ],
-      }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 2048,
-      },
+      contents: [{ parts: [{ text: EXTRACTION_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
     };
 
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
       if (!response.ok) {
         const errorText = await response.text();
-        // Retry on 503 (overload) — wait 2s and try same model once
         if (response.status === 503) {
           await new Promise((r) => setTimeout(r, 2000));
           const retry = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -147,16 +168,9 @@ async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: s
         continue;
       }
 
-      const data = await response.json() as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      };
-
+      const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) {
-        lastError = `${model}: No text in response`;
-        continue;
-      }
-
+      if (!text) { lastError = `${model}: No text in response`; continue; }
       return text;
     } catch (err) {
       lastError = `${model}: ${err instanceof Error ? err.message : String(err)}`;
@@ -167,75 +181,97 @@ async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: s
   throw new Error(`All Gemini models failed. Last error: ${lastError}`);
 }
 
-function evaluateField(
-  fieldName: string,
-  ruleId: string,
-  extracted: ExtractedFieldValue,
-  requirement: string
-): { field: FieldStatus; violation: ViolationData | null } {
+function normalizeFieldName(key: string): string {
+  const map: Record<string, string> = {
+    product_name: "productName", productname: "productName", product: "productName",
+    manufacturer_name: "manufacturer", manufacturername: "manufacturer", maker: "manufacturer",
+    net_quantity: "netQuantity", netquantity: "netQuantity", quantity: "netQuantity", weight: "netQuantity",
+    mrp_price: "mrp", mrpprice: "mrp", price: "mrp", maximumretailprice: "mrp",
+    consumer_care: "consumerCare", consumercare: "consumerCare", contact: "consumerCare", care: "consumerCare",
+    manufacturing_date: "manufacturingDate", manufacturingdate: "manufacturingDate", packeddate: "manufacturingDate", mfg: "manufacturingDate",
+    expiry_date: "expiryDate", expirydate: "expiryDate", usebefore: "expiryDate", exp: "expiryDate", bestbefore: "expiryDate",
+    country_of_origin: "countryOfOrigin", countryoforigin: "countryOfOrigin", origin: "countryOfOrigin", madein: "countryOfOrigin",
+    batch_number: "batchNumber", batchnumber: "batchNumber", lot: "batchNumber", lotnumber: "batchNumber",
+    veg_non_veg: "vegNonVeg", vegnonveg: "vegNonVeg", vegetarian: "vegNonVeg", veg: "vegNonVeg",
+    fssai: "fssaiLicense", fssailicense: "fssaiLicense", license: "fssaiLicense", foodlicense: "fssaiLicense",
+  };
+  const clean = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return map[clean] || map[key.toLowerCase()] || key;
+}
+
+function evaluateField(fieldName: string, extracted: ExtractedFieldValue, ruleId: number): FieldStatus {
+  const rule = RULE_REQUIREMENTS[ruleId];
   const hasValue = extracted.value && extracted.value.trim().length > 0;
-  const confidence = extracted.confidence;
+  const confidence = extracted.confidence || 0;
+  const aiCompliance = extracted.complianceStatus;
 
   let status: "compliant" | "review-required" | "non-compliant";
-  if (!hasValue || confidence === 0) {
+
+  // Trust Gemini's compliance verdict if available and confidence is reasonable
+  if (aiCompliance === "violation" && confidence > 30) {
     status = "non-compliant";
-  } else if (confidence < 85) {
+  } else if (aiCompliance === "warning" && confidence > 30) {
+    status = "review-required";
+  } else if (aiCompliance === "compliant" && confidence >= 70) {
+    status = "compliant";
+  } else if (!hasValue || confidence === 0) {
+    status = "non-compliant";
+  } else if (confidence < 70) {
     status = "review-required";
   } else {
     status = "compliant";
   }
 
-  if (fieldName === "mrp" && hasValue) {
-    const hasRupee = extracted.value.includes("₹") || extracted.value.includes("Rs") || extracted.value.includes("INR");
-    if (!hasRupee) status = "review-required";
-  }
-
-  if ((fieldName === "manufacturingDate" || fieldName === "expiryDate") && hasValue) {
-    const datePattern = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{1,2}\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*\d{2,4}/i;
-    if (!datePattern.test(extracted.value)) status = "review-required";
-  }
-
-  const field: FieldStatus = {
+  return {
     fieldName,
-    ruleId,
-    value: extracted.value,
+    ruleId: String(ruleId),
+    value: extracted.value || "",
     confidence,
     status,
     ...(extracted.boundingBox ? { boundingBox: extracted.boundingBox } : {}),
+    complianceReason: extracted.complianceReason || "",
   };
-
-  let violation: ViolationData | null = null;
-
-  if (status === "non-compliant") {
-    violation = {
-      ruleId,
-      title: `Missing ${requirement.split(" must")[0] || fieldName}`,
-      severity: "high",
-      field: fieldName,
-      expected: requirement,
-      detected: "Not found on label",
-      evidence: `The AI vision model scanned the label but could not detect ${fieldName} in any visible region.`,
-      explanation: `Legal Metrology regulations require ${requirement}. The AI system analyzed the product label image but could not reliably identify this declaration. This could be due to missing text, poor print quality, small font size, or the information being on a different part of the packaging not visible in the uploaded image.`,
-      recommendation: "Inspector should verify physically whether this declaration exists on the product packaging. Check all visible sides and panels of the product.",
-    };
-  } else if (status === "review-required") {
-    violation = {
-      ruleId,
-      title: `Low Confidence: ${fieldName}`,
-      severity: confidence < 50 ? "high" : "medium",
-      field: fieldName,
-      expected: requirement,
-      detected: `${extracted.value} — ${confidence}% confidence`,
-      evidence: `The text was detected but OCR confidence is below the automated approval threshold of 85%.`,
-      explanation: `The system detected text resembling ${fieldName} but with ${confidence}% confidence, which is below the 85% threshold for automated validation. This could be due to image quality, small font, low contrast, partial obstruction, or text being at an angle.`,
-      recommendation: "Inspector should manually verify this field against the physical product label.",
-    };
-  }
-
-  return { field, violation };
 }
 
-function calculateCompliance(fields: FieldStatus[], violations: ViolationData[]): {
+function generateViolations(fields: FieldStatus[]): ViolationData[] {
+  const violations: ViolationData[] = [];
+
+  for (const field of fields) {
+    const ruleId = Number(field.ruleId);
+    const rule = RULE_REQUIREMENTS[ruleId];
+    if (!rule) continue;
+
+    if (field.status === "non-compliant") {
+      violations.push({
+        ruleId: field.ruleId,
+        title: `Missing: ${rule.declaration}`,
+        severity: rule.severity,
+        field: field.fieldName,
+        expected: rule.requirement,
+        detected: field.value || "Not found on label",
+        evidence: field.complianceReason || `The AI vision model scanned the label but could not find ${rule.declaration}.`,
+        explanation: field.complianceReason || `Legal Metrology rules require ${rule.requirement}. This declaration was not found or could not be verified on the product label.`,
+        recommendation: `Inspector should physically verify whether ${rule.declaration.toLowerCase()} exists on the product packaging.`,
+      });
+    } else if (field.status === "review-required") {
+      violations.push({
+        ruleId: field.ruleId,
+        title: `Review: ${rule.declaration}`,
+        severity: field.confidence < 50 ? "high" : "medium",
+        field: field.fieldName,
+        expected: rule.requirement,
+        detected: `${field.value} — ${field.confidence}% confidence`,
+        evidence: field.complianceReason || `Field detected but below automated verification threshold.`,
+        explanation: field.complianceReason || `The system detected this field but with ${field.confidence}% confidence. Manual verification recommended.`,
+        recommendation: `Inspector should manually verify ${rule.declaration.toLowerCase()} against the physical product label.`,
+      });
+    }
+  }
+
+  return violations;
+}
+
+function calculateScore(fields: FieldStatus[], isFoodProduct: boolean): {
   score: number;
   status: "compliant" | "review-required" | "non-compliant";
   categories: ComplianceCategory[];
@@ -270,38 +306,48 @@ function calculateCompliance(fields: FieldStatus[], violations: ViolationData[])
     if (!mapping) continue;
     const cat = categoryScores.find((c) => c.name === mapping.category);
     if (!cat) continue;
-    let points = 0;
-    if (field.status === "compliant") points = mapping.weight;
-    else if (field.status === "review-required") points = Math.round(mapping.weight * (field.confidence / 100) * 0.7);
-    cat.score += points;
+
+    if (field.status === "compliant") {
+      cat.score += mapping.weight;
+    } else if (field.status === "review-required") {
+      cat.score += Math.round(mapping.weight * (field.confidence / 100) * 0.6);
+    }
   }
 
-  const avgConfidence = fields.reduce((sum, f) => sum + f.confidence, 0) / fields.length;
+  // FSSAI bonus for food products
+  if (isFoodProduct) {
+    const fssai = fields.find((f) => f.fieldName === "fssaiLicense");
+    if (fssai && fssai.status === "compliant") {
+      const mandCat = categoryScores.find((c) => c.name === "Mandatory Declarations");
+      if (mandCat) mandCat.score += 5;
+    }
+  }
+
+  const avgConfidence = fields.length > 0 ? fields.reduce((sum, f) => sum + f.confidence, 0) / fields.length : 0;
   const ocrCat = categoryScores.find((c) => c.name === "OCR Confidence");
   if (ocrCat) ocrCat.score = Math.round((avgConfidence / 100) * ocrCat.maxScore);
 
   const totalScore = categoryScores.reduce((sum, c) => sum + c.score, 0);
   const maxTotal = categoryScores.reduce((sum, c) => sum + c.maxScore, 0);
-  const score = Math.round((totalScore / maxTotal) * 100);
+  const score = Math.min(100, Math.round((totalScore / maxTotal) * 100));
 
-  const hasMissingFields = violations.filter((v) => v.severity === "high" && v.title.includes("Missing")).length > 0;
-
+  const highMissing = fields.filter((f) => f.status === "non-compliant" && Number(f.ruleId) <= 7);
   let status: "compliant" | "review-required" | "non-compliant";
-  if (score >= 85 && !hasMissingFields) status = "compliant";
-  else if (hasMissingFields || score < 50) status = "non-compliant";
+  if (score >= 80 && highMissing.length === 0) status = "compliant";
+  else if (highMissing.length >= 2 || score < 40) status = "non-compliant";
   else status = "review-required";
 
   const missingFields = fields.filter((f) => f.status === "non-compliant").map((f) => f.fieldName);
-  const lowConfFields = fields.filter((f) => f.status === "review-required").map((f) => f.fieldName);
-  const compliantFields = fields.filter((f) => f.status === "compliant").map((f) => f.fieldName);
+  const reviewFields = fields.filter((f) => f.status === "review-required").map((f) => f.fieldName);
+  const okFields = fields.filter((f) => f.status === "compliant").map((f) => f.fieldName);
 
   let explanation = "";
   if (status === "compliant") {
-    explanation = `All ${compliantFields.length} mandatory declarations have been detected with high confidence. The product label appears to meet Legal Metrology compliance requirements.`;
+    explanation = `${okFields.length} of ${fields.length} declarations verified as compliant. Product label meets Legal Metrology requirements.`;
   } else if (status === "non-compliant") {
-    explanation = `Critical compliance issues detected. ${missingFields.length > 0 ? `Missing declarations: ${missingFields.join(", ")}. ` : ""}${lowConfFields.length > 0 ? `Fields requiring review: ${lowConfFields.join(", ")}. ` : ""}Immediate inspector attention recommended.`;
+    explanation = `${missingFields.length} critical declaration(s) missing or non-compliant: ${missingFields.join(", ")}. ${reviewFields.length > 0 ? `Additionally, ${reviewFields.length} field(s) need manual review: ${reviewFields.join(", ")}.` : ""} Immediate inspector attention required.`;
   } else {
-    explanation = `The label has most required declarations but several fields have OCR confidence below the automated approval threshold. ${lowConfFields.length > 0 ? `Fields needing review: ${lowConfFields.join(", ")}. ` : ""}Inspector manual verification is recommended.`;
+    explanation = `${okFields.length} declarations compliant, but ${reviewFields.length} field(s) need manual verification: ${reviewFields.join(", ")}. ${missingFields.length > 0 ? `${missingFields.length} field(s) missing: ${missingFields.join(", ")}.` : ""} Inspector review recommended.`;
   }
 
   return { score, status, categories: categoryScores, explanation };
@@ -311,109 +357,71 @@ export const analyzeLabel = action({
   args: {
     imageBase64: v.string(),
     productInfo: v.object({
-      productName: v.string(),
-      manufacturer: v.string(),
-      brand: v.string(),
-      category: v.string(),
-      batchNumber: v.string(),
-      mrp: v.string(),
-      inspectorId: v.string(),
-      location: v.string(),
-      dateTime: v.string(),
+      productName: v.string(), manufacturer: v.string(), brand: v.string(),
+      category: v.string(), batchNumber: v.string(), mrp: v.string(),
+      inspectorId: v.string(), location: v.string(), dateTime: v.string(),
     }),
   },
   handler: async (_ctx, args): Promise<ComplianceAnalysisResult> => {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not configured. Please add it in the project's Keys/API keys settings.");
-    }
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not configured.");
 
-    // Extract base64 data and mime type from the data URL
     let imageData = args.imageBase64;
     let mimeType = "image/jpeg";
-
     if (imageData.startsWith("data:")) {
       const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
-      if (match) {
-        mimeType = match[1];
-        imageData = match[2];
-      }
+      if (match) { mimeType = match[1]; imageData = match[2]; }
     }
 
-    // Call Gemini via direct REST API
     const responseText = await callGeminiVision(apiKey, imageData, mimeType);
 
-    // Parse JSON from response — robust extraction
+    // Parse JSON
     let extraction: ExtractionResult;
     try {
-      let cleaned = responseText;
-      // Remove markdown code fences
-      cleaned = cleaned.replace(/```json\s*/gi, "").replace(/```\s*/gi, "");
-      // Find the first { and last } to extract JSON object
+      let cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*/gi, "");
       const firstBrace = cleaned.indexOf("{");
       const lastBrace = cleaned.lastIndexOf("}");
-      if (firstBrace !== -1 && lastBrace > firstBrace) {
-        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-      }
+      if (firstBrace !== -1 && lastBrace > firstBrace) cleaned = cleaned.substring(firstBrace, lastBrace + 1);
       extraction = JSON.parse(cleaned.trim());
     } catch {
-      extraction = {
-        fields: {},
-        rawText: responseText.substring(0, 2000),
-        imageQuality: "unknown",
-      };
+      extraction = { fields: {}, rawText: responseText.substring(0, 2000), imageQuality: "unknown", isFoodProduct: false, overallAssessment: "Could not parse AI response" };
     }
 
-    // Normalize field names — Gemini may return different keys
+    // Normalize field names
     if (extraction.fields) {
-      const fieldMap: Record<string, string> = {
-        product_name: "productName", productname: "productName", "product name": "productName",
-        manufacturer_name: "manufacturer", manufacturername: "manufacturer", "manufacturer name": "manufacturer",
-        net_quantity: "netQuantity", netquantity: "netQuantity", "net quantity": "netQuantity", quantity: "netQuantity",
-        mrp_price: "mrp", "mrp price": "mrp", price: "mrp", "maximum retail price": "mrp",
-        consumer_care: "consumerCare", consumercare: "consumerCare", "consumer care": "consumerCare", contact: "consumerCare",
-        manufacturing_date: "manufacturingDate", manufacturingdate: "manufacturingDate", "manufacturing date": "manufacturingDate", "packed date": "manufacturingDate",
-        expiry_date: "expiryDate", expirydate: "expiryDate", "expiry date": "expiryDate", "use before": "expiryDate",
-        country_of_origin: "countryOfOrigin", countryoforigin: "countryOfOrigin", "country of origin": "countryOfOrigin", origin: "countryOfOrigin",
-        batch_number: "batchNumber", batchnumber: "batchNumber", "batch number": "batchNumber", lot: "batchNumber",
-        veg_non_veg: "vegNonVeg", vegnonveg: "vegNonVeg", "veg non veg": "vegNonVeg", vegetarian: "vegNonVeg",
-        fssai: "fssaiLicense", "fssai number": "fssaiLicense", license: "fssaiLicense",
-      };
       const normalized: Record<string, ExtractedFieldValue> = {};
       for (const [key, val] of Object.entries(extraction.fields)) {
-        const normalizedKey = fieldMap[key.toLowerCase().replace(/[^a-z0-9]/g, "")] || fieldMap[key.toLowerCase()] || key;
-        const existing = normalized[normalizedKey];
-        // Keep the one with higher confidence
-        if (!existing || (val && typeof val === "object" && (val.confidence || 0) > (existing.confidence || 0))) {
-          normalized[normalizedKey] = val as ExtractedFieldValue;
+        if (typeof val !== "object" || val === null) continue;
+        const normKey = normalizeFieldName(key);
+        const existing = normalized[normKey];
+        if (!existing || ((val as ExtractedFieldValue).confidence || 0) > (existing.confidence || 0)) {
+          normalized[normKey] = val as ExtractedFieldValue;
         }
       }
       extraction.fields = normalized;
     }
 
-    // Run compliance evaluation
+    // Evaluate each rule
     const fieldResults: FieldStatus[] = [];
-    const allViolations: ViolationData[] = [];
+    for (const [ruleNum] of Object.entries(RULE_REQUIREMENTS)) {
+      const ruleId = Number(ruleNum);
+      const fieldName = Object.entries({ 1: "productName", 2: "manufacturer", 3: "netQuantity", 4: "mrp", 5: "consumerCare", 6: "manufacturingDate", 7: "expiryDate", 8: "countryOfOrigin", 9: "batchNumber", 10: "vegNonVeg", 11: "fssaiLicense" }).find(([, v]) => true)?.[1] || "";
+      // Map rule ID to field name
+      const ruleToField: Record<number, string> = { 1: "productName", 2: "manufacturer", 3: "netQuantity", 4: "mrp", 5: "consumerCare", 6: "manufacturingDate", 7: "expiryDate", 8: "countryOfOrigin", 9: "batchNumber", 10: "vegNonVeg", 11: "fssaiLicense" };
+      const fn = ruleToField[ruleId];
+      if (!fn) continue;
 
-    for (const rule of COMPLIANCE_RULES) {
-      const extractedField = extraction.fields[rule.field] || { value: "", confidence: 0, boundingBox: null };
-      const { field, violation } = evaluateField(rule.field, rule.id, extractedField, rule.requirement);
-      fieldResults.push(field);
-      if (violation) allViolations.push(violation);
+      const extracted = extraction.fields[fn] || { value: "", confidence: 0, boundingBox: null, complianceStatus: "violation", complianceReason: "Field not detected", ruleId };
+      fieldResults.push(evaluateField(fn, extracted as ExtractedFieldValue, ruleId));
     }
 
-    const { score, status, categories, explanation } = calculateCompliance(fieldResults, allViolations);
+    const violations = generateViolations(fieldResults);
+    const { score, status, categories, explanation } = calculateScore(fieldResults, extraction.isFoodProduct || false);
 
     return {
-      score,
-      status,
-      fields: fieldResults,
-      violations: allViolations,
-      categories,
-      explanation,
-      rawOcrText: extraction.rawText || "",
-      imageQuality: extraction.imageQuality || "unknown",
-      mode: "live",
+      score, status, fields: fieldResults, violations, categories,
+      explanation: extraction.overallAssessment ? `${extraction.overallAssessment} ${explanation}` : explanation,
+      rawOcrText: extraction.rawText || "", imageQuality: extraction.imageQuality || "unknown", mode: "live",
     };
   },
 });
