@@ -100,7 +100,7 @@ interface ComplianceAnalysisResult {
 // Direct REST API call to Gemini — more reliable than SDK
 async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: string): Promise<string> {
   // Try multiple models in order
-  const models = ["gemini-2.5-flash", "gemini-2.5-pro"];
+  const models = ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash"];
   let lastError = "";
 
   for (const model of models) {
