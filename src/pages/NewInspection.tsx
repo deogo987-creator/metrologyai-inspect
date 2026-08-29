@@ -1,9 +1,11 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router";
+import { useState, useRef, useCallback } from "react";
+import { useNavigate } from "react-router";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { demoProducts, generateInspectionId, generateMockComplianceResult } from "@/lib/demo-data";
-import type { ProductInfo, ComplianceResult, ExtractedField, Violation, InspectionStatus } from "@/lib/types";
+import { generateInspectionId } from "@/lib/demo-data";
+import type { ProductInfo, ComplianceResult, ExtractedField, InspectionStatus } from "@/lib/types";
 import {
   Upload,
   Camera,
@@ -13,7 +15,6 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowLeft,
-  Loader2,
   Eye,
   FileText,
   Shield,
@@ -42,87 +43,165 @@ const steps = [
   { num: 3, label: "AI Inspection" },
 ];
 
+// Convert a File to base64 data URL
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Stored image files (keyed by blob URL → base64)
+const imageStore = new Map<string, string>();
+
 export default function NewInspection() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const demoIndex = (location.state as { demoIndex?: number })?.demoIndex;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const analyzeLabel = useAction(api.analyzeLabel.analyzeLabel);
 
   const [step, setStep] = useState<Step>(1);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStage, setProcessingStage] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [productInfo, setProductInfo] = useState<ProductInfo>({
     productName: "", manufacturer: "", brand: "", category: "",
-    batchNumber: "", mrp: "", inspectorId: "INS-LM-042",
+    batchNumber: "", mrp: "", inspectorId: "",
     location: "", dateTime: new Date().toISOString().slice(0, 16),
   });
-  const [images, setImages] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [result, setResult] = useState<ComplianceResult | null>(null);
   const [editingFields, setEditingFields] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedViolation, setSelectedViolation] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [rawOcrText, setRawOcrText] = useState("");
   const inspectionId = useRef(generateInspectionId());
-
-  // Load demo product if specified
-  useEffect(() => {
-    if (demoIndex !== undefined && demoProducts[demoIndex]) {
-      const demo = demoProducts[demoIndex];
-      setProductInfo({
-        productName: demo.name.split(" — ")[0].replace("Product [A-C] — ", ""),
-        manufacturer: "Demo Manufacturer Pvt Ltd",
-        brand: "Demo Brand",
-        category: "Food",
-        batchNumber: "B240812",
-        mrp: "₹120",
-        inspectorId: "INS-LM-042",
-        location: "Delhi Central Market",
-        dateTime: new Date().toISOString().slice(0, 16),
-      });
-      setImages(["demo-label-image"]);
-      setStep(3);
-      runAIInspection(demo.result);
-    }
-  }, [demoIndex]);
 
   const updateField = (field: keyof ProductInfo, value: string) => {
     setProductInfo((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleFileUpload = useCallback((files: FileList | null) => {
+  const handleFileUpload = useCallback(async (files: FileList | null) => {
     if (!files) return;
-    const newImages: string[] = [];
-    Array.from(files).forEach((file) => {
-      if (file.type.startsWith("image/") || file.type === "application/pdf") {
-        const url = URL.createObjectURL(file);
-        newImages.push(url);
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+
+    for (const file of Array.from(files)) {
+      if (file.type.startsWith("image/")) {
+        newFiles.push(file);
+        const preview = URL.createObjectURL(file);
+        newPreviews.push(preview);
+        // Store base64 for later use
+        const base64 = await fileToBase64(file);
+        imageStore.set(preview, base64);
       }
-    });
-    setImages((prev) => [...prev, ...newImages]);
+    }
+
+    setImageFiles((prev) => [...prev, ...newFiles]);
+    setImagePreviews((prev) => [...prev, ...newPreviews]);
   }, []);
 
   const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => {
+      const url = prev[index];
+      if (url) {
+        URL.revokeObjectURL(url);
+        imageStore.delete(url);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
-  const runAIInspection = async (overrideResult?: ComplianceResult) => {
+  const runAIInspection = async () => {
+    if (imageFiles.length === 0) return;
+
     setStep(3);
     setIsProcessing(true);
+    setError(null);
+
     const stages = [
       "Initializing image pre-processing...",
-      "Running OCR text extraction...",
-      "Detecting label fields...",
-      "Extracting declarations...",
+      "Sending to AI Vision model for OCR...",
+      "Detecting label fields and declarations...",
       "Running compliance rule engine...",
-      "Generating risk score...",
+      "Calculating risk score...",
     ];
-    for (const stage of stages) {
-      setProcessingStage(stage);
-      await new Promise((r) => setTimeout(r, 500 + Math.random() * 400));
+
+    // Animate through stages while the real API call runs
+    let stageIndex = 0;
+    const stageTimer = setInterval(() => {
+      if (stageIndex < stages.length) {
+        setProcessingStage(stages[stageIndex]);
+        stageIndex++;
+      }
+    }, 600);
+
+    try {
+      // Use the first image for analysis
+      const base64 = imageStore.get(imagePreviews[0]);
+      if (!base64) {
+        throw new Error("Image data not found. Please re-upload the image.");
+      }
+
+      setProcessingStage("Sending to AI Vision model for OCR...");
+
+      const aiResult = await analyzeLabel({
+        imageBase64: base64,
+        productInfo: {
+          productName: productInfo.productName,
+          manufacturer: productInfo.manufacturer,
+          brand: productInfo.brand,
+          category: productInfo.category,
+          batchNumber: productInfo.batchNumber,
+          mrp: productInfo.mrp,
+          inspectorId: productInfo.inspectorId,
+          location: productInfo.location,
+          dateTime: productInfo.dateTime,
+        },
+      });
+
+      // Map the result to our ComplianceResult type
+      const mappedResult: ComplianceResult = {
+        score: aiResult.score,
+        status: aiResult.status,
+        fields: aiResult.fields.map((f: { fieldName: string; value: string; confidence: number; status: "compliant" | "review-required" | "non-compliant"; boundingBox?: { x: number; y: number; width: number; height: number } | null }, i: number) => ({
+          id: `f${i + 1}`,
+          fieldName: f.fieldName,
+          value: f.value,
+          confidence: f.confidence,
+          status: f.status,
+          boundingBox: f.boundingBox ?? undefined,
+        })),
+        violations: aiResult.violations.map((v: { ruleId: string; title: string; severity: "high" | "medium" | "low"; field: string; expected: string; detected: string; evidence: string; explanation: string; recommendation: string }, i: number) => ({
+          id: `v${i + 1}`,
+          ruleId: v.ruleId,
+          title: v.title,
+          severity: v.severity,
+          field: v.field,
+          expected: v.expected,
+          detected: v.detected,
+          evidence: v.evidence,
+          explanation: v.explanation,
+          recommendation: v.recommendation,
+        })),
+        categories: aiResult.categories,
+        explanation: aiResult.explanation,
+      };
+
+      setRawOcrText(aiResult.rawOcrText || "");
+      setResult(mappedResult);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Analysis failed. Please try again.";
+      setError(message);
+      setStep(2);
+    } finally {
+      clearInterval(stageTimer);
+      setIsProcessing(false);
     }
-    const res = overrideResult || generateMockComplianceResult(productInfo.productName || "Sample Product");
-    setResult(res);
-    setIsProcessing(false);
   };
 
   const handleFieldEdit = (fieldId: string, value: string) => {
@@ -139,8 +218,19 @@ export default function NewInspection() {
     setEditingId(null);
   };
 
+  const resetInspection = () => {
+    setStep(1);
+    setResult(null);
+    setImageFiles([]);
+    setImagePreviews([]);
+    setEditingFields({});
+    setRawOcrText("");
+    setError(null);
+    inspectionId.current = generateInspectionId();
+  };
+
   const canProceedStep1 = productInfo.productName.trim() !== "";
-  const canProceedStep2 = images.length > 0;
+  const canProceedStep2 = imageFiles.length > 0;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -151,6 +241,20 @@ export default function NewInspection() {
           {step === 3 && result ? "AI Inspection Results" : `Step ${step}: ${steps[step - 1].label}`}
         </h1>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="glass-card rounded-2xl p-4 border border-red-200 bg-red-50/50">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-red-800">Analysis Error</p>
+              <p className="text-xs text-red-600 mt-1">{error}</p>
+              <button onClick={() => setError(null)} className="mt-2 text-xs font-semibold text-red-700 underline">Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Step indicator */}
       {!isProcessing && !result && (
@@ -284,29 +388,19 @@ export default function NewInspection() {
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*,.pdf"
+            accept="image/*"
             onChange={(e) => handleFileUpload(e.target.files)}
             className="hidden"
           />
 
           {/* Uploaded images */}
-          {images.length > 0 && (
+          {imagePreviews.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 mb-3">{images.length} image(s) uploaded</p>
+              <p className="text-xs font-semibold text-gray-500 mb-3">{imagePreviews.length} image(s) uploaded</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {images.map((img, i) => (
+                {imagePreviews.map((img, i) => (
                   <div key={i} className="relative group rounded-xl overflow-hidden border border-white/50 bg-white/50">
-                    {img === "demo-label-image" ? (
-                      <div className="aspect-[4/3] flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
-                        <div className="text-center">
-                          <FileText className="h-10 w-10 text-blue-300 mx-auto" />
-                          <p className="text-xs font-medium text-blue-600 mt-2">Demo Label Image</p>
-                          <p className="text-[10px] text-gray-400 mt-1">Simulated product label</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <img src={img} alt="Label" className="w-full aspect-[4/3] object-cover" />
-                    )}
+                    <img src={img} alt={`Label ${i + 1}`} className="w-full aspect-[4/3] object-cover" />
                     <button
                       onClick={() => removeImage(i)}
                       className="absolute top-2 right-2 h-6 w-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -325,8 +419,8 @@ export default function NewInspection() {
               Back
             </Button>
             <Button
-              onClick={() => runAIInspection()}
-              disabled={!canProceedStep2}
+              onClick={runAIInspection}
+              disabled={!canProceedStep2 || isProcessing}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold px-6 rounded-xl shadow-lg shadow-blue-500/20"
             >
               <Sparkles className="mr-2 h-4 w-4" />
@@ -354,12 +448,19 @@ export default function NewInspection() {
           <div className="max-w-xs mx-auto h-1.5 rounded-full bg-gray-100 overflow-hidden">
             <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-pulse" style={{ width: "70%" }} />
           </div>
+          <p className="text-[10px] text-gray-400">Powered by OpenAI GPT-4o Vision</p>
         </div>
       )}
 
       {/* Step 3: AI Inspection Results */}
       {step === 3 && result && !isProcessing && (
         <>
+          {/* Live mode indicator */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 w-fit">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">Live AI Analysis</span>
+          </div>
+
           {/* Compliance Score Banner */}
           <div className={`glass-card rounded-2xl p-6 border ${
             result.status === "compliant" ? "border-green-200" : result.status === "non-compliant" ? "border-red-200" : "border-amber-200"
@@ -404,7 +505,7 @@ export default function NewInspection() {
                   View Report
                 </Button>
                 <Button
-                  onClick={() => { setStep(1); setResult(null); setImages([]); setEditingFields({}); }}
+                  onClick={resetInspection}
                   variant="outline"
                   className="rounded-xl text-xs"
                 >
@@ -423,64 +524,58 @@ export default function NewInspection() {
                 <Eye className="h-4 w-4 text-blue-600" />
                 <h3 className="text-sm font-bold text-gray-900">Product Label</h3>
               </div>
-              <div className="relative bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-xl aspect-[4/3] flex items-center justify-center overflow-hidden border border-white/50">
-                {/* Simulated label with bounding boxes */}
-                <div className="absolute inset-0 p-6">
-                  <div className="w-full h-full bg-white rounded-lg shadow-inner p-4 relative">
-                    <p className="text-xs font-bold text-gray-800 mb-1">{productInfo.productName || "Product Name"}</p>
-                    <p className="text-[10px] text-gray-500 mb-3">{productInfo.manufacturer || "Manufacturer Name"}</p>
-                    <div className="space-y-2">
-                      {result.fields.filter(f => f.value).slice(0, 6).map((field) => (
-                        <div
-                          key={field.id}
-                          className={`p-1.5 rounded border text-[10px] transition-all ${
-                            field.status === "compliant"
-                              ? "border-green-300 bg-green-50/50"
-                              : field.status === "review-required"
-                                ? "border-amber-300 bg-amber-50/50"
-                                : "border-red-300 bg-red-50/50"
-                          }`}
-                        >
-                          <span className="font-semibold text-gray-700">{field.fieldName}:</span>{" "}
-                          <span className="text-gray-600">{field.value}</span>
+              <div className="relative bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-xl overflow-hidden border border-white/50">
+                {/* Real uploaded image */}
+                {imagePreviews.length > 0 ? (
+                  <div className="relative">
+                    <img src={imagePreviews[0]} alt="Product Label" className="w-full object-contain max-h-[500px]" />
+                    {/* Overlay bounding boxes */}
+                    {result.fields.filter(f => f.boundingBox).map((field) => (
+                      <div
+                        key={`box-${field.id}`}
+                        className={`absolute border-2 rounded pointer-events-none transition-all ${
+                          field.status === "compliant"
+                            ? "border-green-400/80"
+                            : field.status === "review-required"
+                              ? "border-amber-400/80"
+                              : "border-red-400/80"
+                        }`}
+                        style={{
+                          left: `${field.boundingBox!.x}%`,
+                          top: `${field.boundingBox!.y}%`,
+                          width: `${field.boundingBox!.width}%`,
+                          height: `${field.boundingBox!.height}%`,
+                        }}
+                      >
+                        <div className={`absolute -top-5 left-0 text-[8px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap ${
+                          field.status === "compliant"
+                            ? "bg-green-500 text-white"
+                            : field.status === "review-required"
+                              ? "bg-amber-500 text-white"
+                              : "bg-red-500 text-white"
+                        }`}>
+                          {field.fieldName} {field.confidence > 0 ? `${field.confidence}%` : ""}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                {/* Overlay bounding boxes */}
-                {result.fields.filter(f => f.boundingBox).map((field) => (
-                  <div
-                    key={`box-${field.id}`}
-                    className={`absolute border-2 rounded pointer-events-none transition-all ${
-                      field.status === "compliant"
-                        ? "border-green-400/60"
-                        : field.status === "review-required"
-                          ? "border-amber-400/60"
-                          : "border-red-400/60"
-                    }`}
-                    style={{
-                      left: `${(field.boundingBox!.x / 300) * 100}%`,
-                      top: `${(field.boundingBox!.y / 160) * 100}%`,
-                      width: `${(field.boundingBox!.width / 300) * 100}%`,
-                      height: `${(field.boundingBox!.height / 160) * 100}%`,
-                    }}
-                  >
-                    <div className={`absolute -top-5 left-0 text-[8px] font-bold px-1.5 py-0.5 rounded ${
-                      field.status === "compliant"
-                        ? "bg-green-500 text-white"
-                        : field.status === "review-required"
-                          ? "bg-amber-500 text-white"
-                          : "bg-red-500 text-white"
-                    }`}>
-                      {field.fieldName} {field.confidence}%
-                    </div>
+                ) : (
+                  <div className="aspect-[4/3] flex items-center justify-center">
+                    <p className="text-xs text-gray-400">No image available</p>
                   </div>
-                ))}
+                )}
               </div>
               <p className="mt-3 text-[10px] text-gray-400 text-center">
-                Bounding boxes show detected fields with confidence scores • Demo Simulation Mode
+                Bounding boxes show detected fields with confidence scores
               </p>
+
+              {/* Raw OCR text */}
+              {rawOcrText && (
+                <div className="mt-4 p-3 rounded-xl bg-white/40 border border-white/50">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Raw OCR Text</p>
+                  <pre className="text-[10px] text-gray-600 whitespace-pre-wrap font-mono max-h-40 overflow-y-auto">{rawOcrText}</pre>
+                </div>
+              )}
             </div>
 
             {/* Right: Extracted fields */}
@@ -541,9 +636,9 @@ export default function NewInspection() {
                 ))}
               </div>
               <div className="mt-4 flex gap-2">
-                <Button variant="outline" size="sm" className="rounded-lg text-xs flex-1">
+                <Button variant="outline" size="sm" onClick={runAIInspection} className="rounded-lg text-xs flex-1">
                   <RotateCcw className="mr-1 h-3 w-3" />
-                  Re-run OCR
+                  Re-run AI Analysis
                 </Button>
                 <Button size="sm" className="rounded-lg text-xs flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                   <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -589,58 +684,57 @@ export default function NewInspection() {
                 <h3 className="text-sm font-bold text-gray-900">Violations ({result.violations.length})</h3>
               </div>
               <div className="space-y-3">
-                {result.violations.map((v, i) => {
-                  const cfg = statusConfig["non-compliant"];
-                  return (
-                    <div key={v.id} className={`rounded-xl border ${cfg.border} overflow-hidden`}>
-                      <button
-                        onClick={() => setSelectedViolation(selectedViolation === v.id ? null : v.id)}
-                        className="w-full p-4 text-left flex items-center gap-3 hover:bg-red-50/30 transition-colors"
-                      >
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                          v.severity === "high" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
-                        }`}>
-                          <AlertTriangle className="h-4 w-4" />
+                {result.violations.map((v, i) => (
+                  <div key={v.id} className={`rounded-xl border overflow-hidden ${
+                    v.severity === "high" ? "border-red-200" : "border-amber-200"
+                  }`}>
+                    <button
+                      onClick={() => setSelectedViolation(selectedViolation === v.id ? null : v.id)}
+                      className="w-full p-4 text-left flex items-center gap-3 hover:bg-white/30 transition-colors"
+                    >
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                        v.severity === "high" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
+                      }`}>
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-gray-400">#{String(i + 1).padStart(2, "0")}</span>
+                          <p className="text-sm font-bold text-gray-900">{v.title}</p>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-gray-400">#{String(i + 1).padStart(2, "0")}</span>
-                            <p className="text-sm font-bold text-gray-900">{v.title}</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">{v.field} • {v.severity.toUpperCase()} severity</p>
+                      </div>
+                      <ChevronRight className={`h-4 w-4 text-gray-300 transition-transform ${selectedViolation === v.id ? "rotate-90" : ""}`} />
+                    </button>
+                    {selectedViolation === v.id && (
+                      <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg bg-white/50">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Expected</p>
+                            <p className="text-xs text-gray-700 mt-1">{v.expected}</p>
                           </div>
-                          <p className="text-[10px] text-gray-500 mt-0.5">{v.field} • {v.severity.toUpperCase()} severity</p>
-                        </div>
-                        <ChevronRight className={`h-4 w-4 text-gray-300 transition-transform ${selectedViolation === v.id ? "rotate-90" : ""}`} />
-                      </button>
-                      {selectedViolation === v.id && (
-                        <div className="px-4 pb-4 space-y-3 border-t border-red-100 pt-3">
-                          <div className="grid sm:grid-cols-2 gap-3">
-                            <div className="p-3 rounded-lg bg-white/50">
-                              <p className="text-[10px] font-bold text-gray-500 uppercase">Expected</p>
-                              <p className="text-xs text-gray-700 mt-1">{v.expected}</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-white/50">
-                              <p className="text-[10px] font-bold text-gray-500 uppercase">Detected</p>
-                              <p className="text-xs text-gray-700 mt-1">{v.detected}</p>
-                            </div>
-                          </div>
-                          <div className="p-3 rounded-lg bg-blue-50/50 border border-blue-100">
-                            <div className="flex items-start gap-2">
-                              <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
-                              <div>
-                                <p className="text-[10px] font-bold text-blue-700 uppercase">Why was this flagged?</p>
-                                <p className="text-xs text-blue-600 mt-1">{v.explanation}</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="p-3 rounded-lg bg-amber-50/50 border border-amber-100">
-                            <p className="text-[10px] font-bold text-amber-700 uppercase">Recommendation</p>
-                            <p className="text-xs text-amber-700 mt-1">{v.recommendation}</p>
+                          <div className="p-3 rounded-lg bg-white/50">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase">Detected</p>
+                            <p className="text-xs text-gray-700 mt-1">{v.detected}</p>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        <div className="p-3 rounded-lg bg-blue-50/50 border border-blue-100">
+                          <div className="flex items-start gap-2">
+                            <Info className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                            <div>
+                              <p className="text-[10px] font-bold text-blue-700 uppercase">Why was this flagged?</p>
+                              <p className="text-xs text-blue-600 mt-1">{v.explanation}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-amber-50/50 border border-amber-100">
+                          <p className="text-[10px] font-bold text-amber-700 uppercase">Recommendation</p>
+                          <p className="text-xs text-amber-700 mt-1">{v.recommendation}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -656,7 +750,7 @@ export default function NewInspection() {
 
           {/* Back button */}
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => { setStep(1); setResult(null); setImages([]); }} className="rounded-xl">
+            <Button variant="outline" onClick={resetInspection} className="rounded-xl">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Start New Inspection
             </Button>
@@ -695,6 +789,16 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
   inspectionId: string;
   onClose: () => void;
 }) {
+  const { CheckCircle2, XCircle, AlertTriangle, X, Shield, Info, Download } = {
+    CheckCircle2: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>,
+    XCircle: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>,
+    AlertTriangle: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>,
+    X: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
+    Shield: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /></svg>,
+    Info: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>,
+    Download: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>,
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
@@ -709,7 +813,6 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
           </button>
         </div>
 
-        {/* Header */}
         <div className="text-center py-4 border-b border-gray-100">
           <div className="flex items-center justify-center gap-2">
             <Shield className="h-5 w-5 text-blue-600" />
@@ -718,7 +821,6 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
           <p className="text-xs text-gray-500 mt-1">AI-Assisted Legal Metrology Inspection Report</p>
         </div>
 
-        {/* Product Info */}
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="p-3 rounded-xl bg-white/40">
             <p className="text-[10px] font-bold text-gray-500 uppercase">Product</p>
@@ -727,12 +829,11 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
           </div>
           <div className="p-3 rounded-xl bg-white/40">
             <p className="text-[10px] font-bold text-gray-500 uppercase">Inspector</p>
-            <p className="text-sm font-semibold text-gray-800 mt-1">{productInfo.inspectorId}</p>
+            <p className="text-sm font-semibold text-gray-800 mt-1">{productInfo.inspectorId || "N/A"}</p>
             <p className="text-xs text-gray-500">{productInfo.location || "N/A"}</p>
           </div>
         </div>
 
-        {/* Score */}
         <div className={`p-4 rounded-xl border ${
           result.status === "compliant" ? "bg-green-50/50 border-green-200" : result.status === "non-compliant" ? "bg-red-50/50 border-red-200" : "bg-amber-50/50 border-amber-200"
         }`}>
@@ -749,7 +850,6 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
           </div>
         </div>
 
-        {/* Fields */}
         <div>
           <h3 className="text-sm font-bold text-gray-900 mb-3">Extracted Declarations</h3>
           <div className="overflow-x-auto">
@@ -782,7 +882,6 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
           </div>
         </div>
 
-        {/* Violations */}
         {result.violations.length > 0 && (
           <div>
             <h3 className="text-sm font-bold text-gray-900 mb-3">Violations</h3>
@@ -797,7 +896,6 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
           </div>
         )}
 
-        {/* Disclaimer */}
         <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100">
           <div className="flex items-start gap-2">
             <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
@@ -807,7 +905,6 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-3 justify-end">
           <Button variant="outline" onClick={onClose} className="rounded-xl text-xs">Close</Button>
           <Button className="rounded-xl text-xs bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
