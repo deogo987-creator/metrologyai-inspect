@@ -281,8 +281,7 @@ export const analyzeLabel = action({
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Use Gemini 2.0 Flash for fast, accurate multimodal analysis
-    const model = genAI.getGenerativeModel({ model: "gemini-3.6-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
 
     // Extract base64 data and mime type from the data URL
     let imageData = args.imageBase64;
