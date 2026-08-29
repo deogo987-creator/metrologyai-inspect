@@ -785,6 +785,97 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
   inspectionId: string;
   onClose: () => void;
 }) {
+  const handleDownloadPDF = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const statusLabel = result.status === "compliant" ? "COMPLIANT" : result.status === "non-compliant" ? "NON-COMPLIANT" : "REVIEW REQUIRED";
+    const statusColor = result.status === "compliant" ? "#16a34a" : result.status === "non-compliant" ? "#dc2626" : "#d97706";
+
+    const fieldsHtml = result.fields.map((f) => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#374151">${f.fieldName}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#4b5563">${f.value || "—"}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280;text-align:center">${f.confidence > 0 ? f.confidence + "%" : "—"}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">
+          <span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:10px;font-weight:700;background:${f.status === "compliant" ? "#dcfce7" : f.status === "review-required" ? "#fef3c7" : "#fee2e2"};color:${f.status === "compliant" ? "#16a34a" : f.status === "review-required" ? "#d97706" : "#dc2626"}">
+            ${f.status === "compliant" ? "OK" : f.status === "review-required" ? "REVIEW" : "FAIL"}
+          </span>
+        </td>
+      </tr>
+    `).join("");
+
+    const violationsHtml = result.violations.length > 0 ? `
+      <h3 style="font-size:14px;font-weight:700;color:#111827;margin:20px 0 10px">Violations (${result.violations.length})</h3>
+      ${result.violations.map((v) => `
+        <div style="padding:10px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca;margin-bottom:8px">
+          <p style="font-size:12px;font-weight:700;color:#991b1b">${v.title}</p>
+          <p style="font-size:11px;color:#b91c1c;margin-top:4px">${v.explanation}</p>
+          <p style="font-size:10px;color:#9ca3af;margin-top:4px">Recommendation: ${v.recommendation}</p>
+        </div>
+      `).join("")}
+    ` : "<p style\u003d\"color:#16a34a;font-weight:700\">No violations detected.</p>";
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html><head><title>Inspection Report - ${inspectionId}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; color: #111827; }
+        @media print { body { margin: 20px; } }
+      </style></head><body>
+      <div style="text-align:center;margin-bottom:20px">
+        <h1 style="font-size:20px;font-weight:800;margin:0">MetrologyAI</h1>
+        <p style="font-size:11px;color:#6b7280;margin:4px 0 0">AI-Assisted Legal Metrology Inspection Report</p>
+      </div>
+      <div style="border-top:2px solid #e5e7eb;border-bottom:1px solid #e5e7eb;padding:12px 0;margin-bottom:16px;display:flex;justify-content:space-between">
+        <span style="font-size:12px;color:#6b7280">Inspection ID: <strong>${inspectionId}</strong></span>
+        <span style="font-size:12px;color:#6b7280">Date: <strong>${productInfo.dateTime || new Date().toLocaleDateString()}</strong></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="padding:10px;border-radius:8px;background:#f9fafb">
+          <p style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:0">Product</p>
+          <p style="font-size:13px;font-weight:600;margin:4px 0 0">${productInfo.productName || "N/A"}</p>
+          <p style="font-size:11px;color:#6b7280;margin:2px 0 0">${productInfo.manufacturer || ""}</p>
+        </div>
+        <div style="padding:10px;border-radius:8px;background:#f9fafb">
+          <p style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:0">Inspector</p>
+          <p style="font-size:13px;font-weight:600;margin:4px 0 0">${productInfo.inspectorId || "N/A"}</p>
+          <p style="font-size:11px;color:#6b7280;margin:2px 0 0">${productInfo.location || ""}</p>
+        </div>
+      </div>
+      <div style="padding:12px;border-radius:8px;border:2px solid ${statusColor}20;background:${statusColor}08;display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <p style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin:0">AI Compliance Risk Score</p>
+          <p style="font-size:24px;font-weight:800;margin:4px 0 0">${result.score} / 100</p>
+        </div>
+        <span style="padding:4px 12px;border-radius:9999px;font-size:11px;font-weight:700;background:${statusColor}18;color:${statusColor}">${statusLabel}</span>
+      </div>
+      <h3 style="font-size:14px;font-weight:700;color:#111827;margin:20px 0 10px">Extracted Declarations</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="border-bottom:2px solid #e5e7eb">
+          <th style="text-align:left;padding:8px;font-weight:700;color:#6b7280;font-size:10px;text-transform:uppercase">Field</th>
+          <th style="text-align:left;padding:8px;font-weight:700;color:#6b7280;font-size:10px;text-transform:uppercase">Value</th>
+          <th style="text-align:center;padding:8px;font-weight:700;color:#6b7280;font-size:10px;text-transform:uppercase">Confidence</th>
+          <th style="text-align:center;padding:8px;font-weight:700;color:#6b7280;font-size:10px;text-transform:uppercase">Status</th>
+        </tr></thead>
+        <tbody>${fieldsHtml}</tbody>
+      </table>
+      ${violationsHtml}
+      <div style="margin-top:24px;padding:12px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe">
+        <p style="font-size:10px;color:#1d4ed8;line-height:1.6;margin:0">
+          <strong>AI Assistance Notice:</strong> This report is generated using AI-assisted extraction and rule-based analysis. Final verification and enforcement decisions remain with the authorized inspector.
+        </p>
+      </div>
+      <div style="margin-top:16px;text-align:center;font-size:9px;color:#9ca3af">
+        <p style="margin:0">MetrologyAI — AI-Assisted Legal Metrology Inspection System</p>
+        <p style="margin:2px 0 0">Generated on ${new Date().toLocaleString()}</p>
+      </div>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); }, 500);
+  };
   const { CheckCircle2, XCircle, AlertTriangle, X, Shield, Info, Download } = {
     CheckCircle2: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>,
     XCircle: (props: React.SVGProps<SVGSVGElement>) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>,
@@ -903,9 +994,12 @@ function ReportModal({ result, productInfo, inspectionId, onClose }: {
 
         <div className="flex gap-3 justify-end">
           <Button variant="outline" onClick={onClose} className="rounded-xl text-xs">Close</Button>
-          <Button className="rounded-xl text-xs bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+          <Button onClick={handleDownloadPDF} className="rounded-xl text-xs bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
             <Download className="mr-1 h-3 w-3" />
             Download PDF
+          </Button>
+          <Button onClick={() => handleDownloadPDF()} variant="outline" className="rounded-xl text-xs">
+            Print Report
           </Button>
         </div>
       </div>
