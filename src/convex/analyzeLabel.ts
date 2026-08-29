@@ -121,7 +121,6 @@ async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: s
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 2048,
-        responseMimeType: "application/json",
       },
     };
 
@@ -344,13 +343,26 @@ export const analyzeLabel = action({
     // Call Gemini via direct REST API
     const responseText = await callGeminiVision(apiKey, imageData, mimeType);
 
-    // Parse JSON from response
+    // Parse JSON from response — robust extraction
     let extraction: ExtractionResult;
     try {
-      const cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
-      extraction = JSON.parse(cleaned);
+      let cleaned = responseText;
+      // Remove markdown code fences
+      cleaned = cleaned.replace(/```json\s*/gi, "").replace(/```\s*/gi, "");
+      // Find the first { and last } to extract JSON object
+      const firstBrace = cleaned.indexOf("{");
+      const lastBrace = cleaned.lastIndexOf("}");
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      }
+      extraction = JSON.parse(cleaned.trim());
     } catch {
-      throw new Error("Failed to parse AI response. Please try again with a clearer label image.");
+      // Last resort: try to reconstruct a basic extraction from raw text
+      extraction = {
+        fields: {},
+        rawText: responseText.substring(0, 2000),
+        imageQuality: "unknown",
+      };
     }
 
     // Run compliance evaluation
