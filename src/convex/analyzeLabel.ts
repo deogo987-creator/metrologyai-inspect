@@ -100,7 +100,7 @@ interface ComplianceAnalysisResult {
 // Direct REST API call to Gemini — more reliable than SDK
 async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: string): Promise<string> {
   // Try multiple models in order
-  const models = ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash"];
+  const models = ["gemini-2.5-flash-lite"];
   let lastError = "";
 
   for (const model of models) {
@@ -134,8 +134,18 @@ async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: s
 
       if (!response.ok) {
         const errorText = await response.text();
+        // Retry on 503 (overload) — wait 2s and try same model once
+        if (response.status === 503) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const retry = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+          if (retry.ok) {
+            const retryData = await retry.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+            const retryText = retryData.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (retryText) return retryText;
+          }
+        }
         lastError = `${model}: HTTP ${response.status} - ${errorText.substring(0, 200)}`;
-        continue; // Try next model
+        continue;
       }
 
       const data = await response.json() as {
