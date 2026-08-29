@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Zap,
   Eye,
-  Clock,
   Star,
 } from "lucide-react";
 
@@ -280,13 +279,13 @@ export default function Landing() {
                   <span className="text-sm font-semibold text-red-800">NON-COMPLIANT — Score 43/100</span>
                 </div>
               </div>
-              <div className="mt-6 p-4 rounded-2xl bg-blue-50/70 border border-blue-200/60">
+              <div className="mt-6 p-4 rounded-2xl bg-green-50/70 border border-green-200/60">
                 <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-4 w-4 text-blue-600" />
-                  <span className="text-xs font-bold text-blue-800 uppercase tracking-wide">Demo Mode</span>
+                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-xs font-bold text-green-800 uppercase tracking-wide">Live AI Integration</span>
                 </div>
-                <p className="text-xs text-blue-700 leading-relaxed">
-                  The system operates in Demo Simulation Mode with realistic sample data. Live AI/OCR integration ready when API credentials are provided.
+                <p className="text-xs text-green-700 leading-relaxed">
+                  Powered by Google Gemini 2.5 Flash — real OCR, real compliance analysis, real results on every inspection.
                 </p>
               </div>
             </div>
