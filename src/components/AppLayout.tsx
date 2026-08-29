@@ -1,5 +1,4 @@
 import { NavLink, Outlet, useNavigate } from "react-router";
-import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -8,7 +7,6 @@ import {
   FileText,
   Shield,
   User,
-  LogOut,
   Menu,
   X,
   Info,
@@ -27,14 +25,8 @@ const navItems = [
 ];
 
 export default function AppLayout() {
-  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -83,19 +75,12 @@ export default function AppLayout() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-gray-800 truncate">
-              {user?.name || "Inspector"}
+              Inspector
             </p>
             <p className="text-[10px] text-gray-500 truncate">
-              INS-LM-042
+              Legal Metrology Division
             </p>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="rounded-lg p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            title="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
         </div>
       </div>
     </div>

@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router";
-import { useAuth } from "@/hooks/use-auth";
 import type { InspectionStatus } from "@/lib/types";
 import {
   LayoutDashboard,
@@ -14,7 +13,6 @@ import {
 } from "lucide-react";
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -24,7 +22,7 @@ export default function Dashboard() {
         <div>
           <p className="text-sm font-medium text-gray-500">Welcome back</p>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            {user?.name || "Inspector"}'s Dashboard
+  Inspector's Dashboard
           </h1>
         </div>
         <button

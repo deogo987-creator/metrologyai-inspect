@@ -61,13 +61,13 @@ export default function Landing() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate("/auth")}
+              onClick={() => navigate("/dashboard")}
               className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors rounded-xl hover:bg-white/50"
             >
               Sign In
             </button>
             <button
-              onClick={() => navigate("/auth")}
+              onClick={() => navigate("/dashboard")}
               className="px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/40"
             >
               Get Started
@@ -122,14 +122,14 @@ export default function Landing() {
               className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
             >
               <button
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate("/dashboard")}
                 className="group px-8 py-3.5 text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-2xl shadow-xl shadow-blue-500/25 transition-all hover:shadow-blue-500/40 flex items-center gap-2"
               >
                 Start Inspection
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate("/dashboard")}
                 className="px-8 py-3.5 text-base font-semibold text-gray-700 glass-card rounded-2xl hover:bg-white/70 transition-all"
               >
                 View Demo
@@ -305,7 +305,7 @@ export default function Landing() {
               Log in as an inspector to start an AI-assisted compliance check. The full demo takes under 3 minutes.
             </p>
             <button
-              onClick={() => navigate("/auth")}
+              onClick={() => navigate("/dashboard")}
               className="mt-8 group px-10 py-4 text-base font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-2xl shadow-xl shadow-blue-500/25 transition-all hover:shadow-blue-500/40 inline-flex items-center gap-2"
             >
               Launch MetrologyAI
