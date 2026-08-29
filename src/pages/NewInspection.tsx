@@ -448,7 +448,7 @@ export default function NewInspection() {
           <div className="max-w-xs mx-auto h-1.5 rounded-full bg-gray-100 overflow-hidden">
             <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-pulse" style={{ width: "70%" }} />
           </div>
-          <p className="text-[10px] text-gray-400">Powered by OpenAI GPT-4o Vision</p>
+          <p className="text-[10px] text-gray-400">Powered by Google Gemini 2.0 Flash</p>
         </div>
       )}
 

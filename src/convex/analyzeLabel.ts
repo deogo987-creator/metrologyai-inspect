@@ -17,7 +17,7 @@ const COMPLIANCE_RULES = [
   { id: "LM-010", declaration: "FSSAI License", field: "fssaiLicense", severity: "high" as const, requirement: "FSSAI license number for food products" },
 ];
 
-const EXTRACTION_PROMPT = `You are an expert Legal Metrology compliance AI for Indian product labels. 
+const EXTRACTION_PROMPT = `You are an expert Legal Metrology compliance AI for Indian product labels.
 Analyze this product label image and extract ALL visible text and information.
 
 For each field, provide:
@@ -223,7 +223,6 @@ function calculateCompliance(fields: FieldStatus[], violations: ViolationData[])
     fssaiLicense: { category: "Mandatory Declarations", weight: 0 },
   };
 
-  // Score each field
   for (const field of fields) {
     const mapping = fieldWeights[field.fieldName];
     if (!mapping) continue;
@@ -241,19 +240,16 @@ function calculateCompliance(fields: FieldStatus[], violations: ViolationData[])
     cat.score += points;
   }
 
-  // OCR confidence score
   const avgConfidence = fields.reduce((sum, f) => sum + f.confidence, 0) / fields.length;
   const ocrCat = categoryScores.find((c) => c.name === "OCR Confidence");
   if (ocrCat) {
     ocrCat.score = Math.round((avgConfidence / 100) * ocrCat.maxScore);
   }
 
-  // Calculate total score
   const totalScore = categoryScores.reduce((sum, c) => sum + c.score, 0);
   const maxTotal = categoryScores.reduce((sum, c) => sum + c.maxScore, 0);
   const score = Math.round((totalScore / maxTotal) * 100);
 
-  // Determine status
   const highViolations = violations.filter((v) => v.severity === "high" && v.title.includes("Missing"));
   const hasMissingFields = highViolations.length > 0;
 
@@ -266,7 +262,6 @@ function calculateCompliance(fields: FieldStatus[], violations: ViolationData[])
     status = "review-required";
   }
 
-  // Generate explanation
   const missingFields = fields.filter((f) => f.status === "non-compliant").map((f) => f.fieldName);
   const lowConfFields = fields.filter((f) => f.status === "review-required").map((f) => f.fieldName);
   const compliantFields = fields.filter((f) => f.status === "compliant").map((f) => f.fieldName);
@@ -299,52 +294,50 @@ export const analyzeLabel = action({
     }),
   },
   handler: async (_ctx, args): Promise<ComplianceAnalysisResult> => {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("OPENAI_API_KEY is not configured. Please add it in the project's Keys/API keys settings.");
+      throw new Error("GEMINI_API_KEY is not configured. Please add it in the project's Keys/API keys settings.");
     }
 
-    const OpenAI = (await import("openai")).default;
-    const openai = new OpenAI({ apiKey });
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(apiKey);
 
-    // Step 1: Send image to GPT-4o Vision for OCR and field extraction
-    const visionResponse = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: EXTRACTION_PROMPT },
-            {
-              type: "image_url",
-              image_url: {
-                url: args.imageBase64.startsWith("data:")
-                  ? args.imageBase64
-                  : `data:image/jpeg;base64,${args.imageBase64}`,
-                detail: "high",
-              },
-            },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 2000,
-      temperature: 0.1,
-    });
+    // Use Gemini 2.0 Flash for fast, accurate multimodal analysis
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const rawContent = visionResponse.choices[0]?.message?.content;
-    if (!rawContent) {
-      throw new Error("No response from AI vision model");
+    // Extract base64 data and mime type from the data URL
+    let imageData = args.imageBase64;
+    let mimeType = "image/jpeg";
+
+    if (imageData.startsWith("data:")) {
+      const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        imageData = match[2];
+      }
     }
 
+    const imagePart = {
+      inlineData: {
+        data: imageData,
+        mimeType,
+      },
+    };
+
+    const result = await model.generateContent([EXTRACTION_PROMPT, imagePart]);
+    const responseText = result.response.text();
+
+    // Parse JSON from response — handle markdown code blocks
     let extraction: ExtractionResult;
     try {
-      extraction = JSON.parse(rawContent);
+      // Strip markdown code fences if present
+      const cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
+      extraction = JSON.parse(cleaned);
     } catch {
-      throw new Error("Failed to parse AI response. Please try again.");
+      throw new Error("Failed to parse AI response. Please try again with a clearer label image.");
     }
 
-    // Step 2: Run compliance evaluation on extracted fields
+    // Run compliance evaluation
     const fieldResults: FieldStatus[] = [];
     const allViolations: ViolationData[] = [];
 
@@ -357,7 +350,6 @@ export const analyzeLabel = action({
       }
     }
 
-    // Step 3: Calculate compliance score
     const { score, status, categories, explanation } = calculateCompliance(fieldResults, allViolations);
 
     return {

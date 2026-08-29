@@ -3,7 +3,7 @@ import { Shield, ArrowDown, Zap, Eye, FileCheck, BarChart3, AlertTriangle, Check
 const pipelineSteps = [
   { icon: Scan, label: "Product Image", desc: "Upload or capture product label" },
   { icon: Cpu, label: "Image Pre-processing", desc: "Enhance, crop, normalize" },
-  { icon: Eye, label: "OCR / Vision Model", desc: "GPT-4o Vision text extraction" },
+  { icon: Eye, label: "OCR / Vision Model", desc: "Gemini 2.0 Flash text extraction" },
   { icon: Database, label: "Text Extraction", desc: "Structured field detection" },
   { icon: Brain, label: "Field Detection", desc: "Declaration identification" },
   { icon: Shield, label: "Rule Engine", desc: "Compliance validation" },
@@ -59,7 +59,7 @@ export default function About() {
         <div className="grid sm:grid-cols-3 gap-4">
           {[
             { step: "1", title: "Upload Label", desc: "Take a photo or upload an image of any product label. Supports JPG, PNG, and WEBP formats." },
-            { step: "2", title: "AI Analysis", desc: "GPT-4o Vision reads every text region on the label, extracts declarations, and assigns confidence scores to each field." },
+            { step: "2", title: "AI Analysis", desc: "Gemini 2.0 Flash reads every text region on the label, extracts declarations, and assigns confidence scores to each field." },
             { step: "3", title: "Compliance Results", desc: "The rule engine evaluates extracted data against 12 Legal Metrology rules, showing compliant, review-required, and non-compliant fields." },
           ].map((s) => (
             <div key={s.step} className="p-4 rounded-xl bg-white/40 border border-white/50">
@@ -78,7 +78,7 @@ export default function About() {
         <h2 className="text-base font-bold text-gray-900 mb-4">Key Benefits</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            "Real AI-powered OCR via GPT-4o Vision",
+            "Real AI-powered OCR via Google Gemini 2.0 Flash",
             "Structured digital evidence and audit trail",
             "Explainable AI — understand why each flag was raised",
             "Consistent rule-based validation across products",
@@ -117,7 +117,7 @@ export default function About() {
         <h2 className="text-base font-bold text-gray-900 mb-4">Technology</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           {[
-            { label: "AI Vision", desc: "OpenAI GPT-4o — OCR, text extraction, field detection" },
+            { label: "AI Vision", desc: "Google Gemini 2.0 Flash — OCR, text extraction, field detection" },
             { label: "Compliance Engine", desc: "Rule-based validation against 12 Legal Metrology rules" },
             { label: "Backend", desc: "Convex serverless actions with real-time capabilities" },
             { label: "Frontend", desc: "React + TypeScript + Vite with Tailwind CSS" },
