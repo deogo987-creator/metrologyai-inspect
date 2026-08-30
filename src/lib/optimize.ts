@@ -4,30 +4,61 @@ import type { ImageQualityIssue, RecaptureRecommendation } from "./types";
  * Compress and resize an image for optimal Gemini API performance.
  * Resizes to max 1200px width and compresses to JPEG quality 82.
  */
-export function compressImage(file: File, maxWidth = 1200, quality = 0.82): Promise<string> {
+export function compressImage(file: File, maxWidth = 1024, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
 
     img.onload = () => {
       URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
+      try {
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        // Also cap height
+        if (height > maxWidth) {
+          width = Math.round((width * maxWidth) / height);
+          height = maxWidth;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { reject(new Error("Failed to get canvas context")); return; }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        // Verify the result is valid and not too large (Gemini limit ~4MB)
+        const base64Part = dataUrl.split(",")[1] || "";
+        if (base64Part.length > 5_000_000) {
+          // Too large, re-compress with lower quality
+          resolve(canvas.toDataURL("image/jpeg", 0.5));
+        } else {
+          resolve(dataUrl);
+        }
+      } catch (err) {
+        reject(new Error(`Image compression failed: ${err instanceof Error ? err.message : String(err)}`));
       }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("Failed to get canvas context")); return; }
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
     };
 
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Failed to load image")); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      // Fallback: read the file as base64 directly
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        if (result && result.startsWith("data:image")) {
+          resolve(result);
+        } else {
+          reject(new Error("Failed to process image file"));
+        }
+      };
+      reader.onerror = () => reject(new Error("Failed to read image file"));
+      reader.readAsDataURL(file);
+    };
     img.src = url;
   });
 }

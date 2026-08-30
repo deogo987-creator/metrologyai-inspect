@@ -214,12 +214,27 @@ export default function NewInspection() {
       addAuditEntry("Inspection Started", `Analyzing ${productInfo.productName}`, "system");
 
       // Build multi-view image array
+      setProcessingStage("Preparing images for analysis...");
       const images = await Promise.all(
         imageFiles.map(async (file, i) => {
-          const cached = compressedCache[imagePreviews[i]];
-          const base64 = cached || (await compressImage(file));
-          if (!base64) throw new Error("Failed to compress image");
-          return { base64, view: imageViews[i] || "front" };
+          try {
+            const cached = compressedCache[imagePreviews[i]];
+            const base64 = cached || (await compressImage(file));
+            if (!base64) throw new Error(`Failed to compress image ${i + 1}`);
+            return { base64, view: imageViews[i] || "front" };
+          } catch (err) {
+            // Fallback: read file directly as base64
+            return new Promise<{ base64: string; view: string }>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = reader.result as string;
+                if (result) resolve({ base64: result, view: imageViews[i] || "front" });
+                else reject(new Error(`Failed to read image ${i + 1}`));
+              };
+              reader.onerror = () => reject(new Error(`Failed to read image ${i + 1}`));
+              reader.readAsDataURL(file);
+            });
+          }
         })
       );
 

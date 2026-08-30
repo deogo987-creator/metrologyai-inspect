@@ -631,6 +631,10 @@ export const analyzeLabel = action({
         const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
         if (match) { mimeType = match[1]; imageData = match[2]; }
       }
+      // Validate base64 data is not empty
+      if (!imageData || imageData.length < 100) {
+        throw new Error("Image data is empty or too small. Please upload a valid image.");
+      }
       return { base64: imageData, mimeType, view: img.view };
     });
 
