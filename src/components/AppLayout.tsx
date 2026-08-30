@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard,
   Search,
@@ -11,8 +12,9 @@ import {
   X,
   Info,
   BarChart3,
+  LogOut,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -26,7 +28,28 @@ const navItems = [
 
 export default function AppLayout() {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Get inspector info from localStorage
+  const inspectorInfo = useMemo(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("metrology-inspector");
+        return stored ? JSON.parse(stored) : { id: "INS-LM-000", name: "Inspector", email: "inspector@metrologyai.gov.in", role: "Inspector" };
+      } catch { return { id: "INS-LM-000", name: "Inspector", email: "inspector@metrologyai.gov.in", role: "Inspector" }; }
+    }
+    return { id: "INS-LM-000", name: "Inspector", email: "inspector@metrologyai.gov.in", role: "Inspector" };
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      localStorage.removeItem("metrology-inspector");
+      navigate("/");
+    } catch { navigate("/"); }
+  };
+
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("metrology-dark-mode") === "true" ||
@@ -87,10 +110,10 @@ export default function AppLayout() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-gray-800 truncate">
-              Inspector
+              {inspectorInfo.name}
             </p>
             <p className="text-[10px] text-gray-500 truncate">
-              Legal Metrology Division
+              {inspectorInfo.id} • {inspectorInfo.role}
             </p>
           </div>
         </div>
@@ -103,6 +126,17 @@ export default function AppLayout() {
           </div>
           <span className="text-xs font-medium text-gray-600">
             {darkMode ? "Light Mode" : "Dark Mode"}
+          </span>
+        </button>
+        <button
+          onClick={handleSignOut}
+          className="w-full flex items-center gap-3 rounded-xl bg-red-50/50 border border-red-100 px-3 py-2.5 text-left hover:bg-red-100/50 transition-colors"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100">
+            <LogOut className="h-4 w-4 text-red-500" />
+          </div>
+          <span className="text-xs font-medium text-red-600">
+            Sign Out
           </span>
         </button>
       </div>

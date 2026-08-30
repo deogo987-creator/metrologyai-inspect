@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
@@ -35,6 +35,19 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [inspectorName, setInspectorName] = useState("Inspector");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("metrology-inspector");
+        if (stored) {
+          const info = JSON.parse(stored);
+          setInspectorName(info.name || "Inspector");
+        }
+      } catch {}
+    }
+  }, []);
 
   const stats = useQuery(api.inspections.getStats);
   const recentInspections = useQuery(api.inspections.getRecent, { limit: 5 });
@@ -85,7 +98,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p className="text-xs sm:text-sm font-medium text-gray-500">Welcome back</p>
+          <p className="text-xs sm:text-sm font-medium text-gray-500">Welcome back, {inspectorName}</p>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight">
             Inspector's Dashboard
           </h1>

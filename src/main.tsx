@@ -133,7 +133,7 @@ createRoot(document.getElementById("root")!).render(
               />
               <Route
                 path="/dashboard"
-                element={<AppLayout />}
+                element={<RequireAuth><AppLayout /></RequireAuth>}
               >
                 <Route index element={<Dashboard />} />
                 <Route path="new-inspection" element={<NewInspection />} />
