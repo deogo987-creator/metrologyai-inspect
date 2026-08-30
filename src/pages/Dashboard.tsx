@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -33,6 +34,18 @@ const searchIntents = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+
+  // Keyboard shortcuts
+  const shortcuts = useMemo(() => ({
+    "ctrl+n": () => navigate("/dashboard/new-inspection"),
+    "ctrl+d": () => navigate("/dashboard/new-inspection?demo=true"),
+    "1": () => navigate("/dashboard"),
+    "2": () => navigate("/dashboard/new-inspection"),
+    "3": () => navigate("/dashboard/history"),
+    "4": () => navigate("/dashboard/analytics"),
+    "5": () => navigate("/dashboard/rules"),
+  }), [navigate]);
+  useKeyboardShortcuts(shortcuts);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [inspectorName, setInspectorName] = useState("Inspector");
@@ -319,6 +332,28 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Keyboard Shortcuts */}
+      <div className="glass-card rounded-2xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Zap className="h-4 w-4 text-amber-500" />
+          <h3 className="text-xs font-bold text-gray-900">Keyboard Shortcuts</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { keys: "Ctrl+N", action: "New Inspection" },
+            { keys: "Ctrl+D", action: "Demo Mode" },
+            { keys: "1-5", action: "Navigate pages" },
+          ].map((s) => (
+            <div key={s.keys} className="flex items-center gap-1.5 text-[10px]">
+              <kbd className="px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 font-mono text-gray-600">
+                {s.keys}
+              </kbd>
+              <span className="text-gray-500">{s.action}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Demo Mode Banner */}

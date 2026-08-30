@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useAction, useMutation } from "convex/react";
+import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -287,6 +288,7 @@ export default function NewInspection() {
       setRawOcrText(aiResult.rawOcrText || "");
       setResult(mappedResult);
       addAuditEntry("Findings Generated", `${aiResult.violations.length} violation(s), Risk: ${aiResult.riskPriority?.level || "low"}`, "ai");
+      toast.success("Analysis complete", { description: `Score: ${aiResult.score}/100 — ${aiResult.status.replace("-", " ")}` });
 
       // Save to database
       try {
@@ -320,6 +322,7 @@ export default function NewInspection() {
           revalidations: JSON.stringify(revalidations),
         });
         addAuditEntry("Inspection Saved", `ID: ${inspectionId.current}`, "system");
+        toast.success("Inspection saved successfully", { description: `ID: ${inspectionId.current}` });
       } catch (saveErr) {
         console.warn("Failed to save inspection:", saveErr);
       }
@@ -328,6 +331,7 @@ export default function NewInspection() {
       setError(message);
       setStep(2);
       addAuditEntry("Analysis Failed", message, "system");
+      toast.error("Analysis failed", { description: message });
     } finally {
       clearInterval(stageTimer);
       setIsProcessing(false);
