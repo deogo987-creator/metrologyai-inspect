@@ -178,3 +178,26 @@
     box-shadow: 0 0 0 3px oklch(0.5 0.14 255 / 10%);
   }
 }
+
+/* Dark mode glass overrides */
+.dark .glass-card {
+  background: oklch(0.2 0.01 260 / 65%);
+  border-color: oklch(1 0 0 / 10%);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 20%);
+}
+.dark .glass-sidebar {
+  background: oklch(0.15 0.01 260 / 80%);
+  border-right-color: oklch(1 0 0 / 8%);
+}
+.dark .glass-header {
+  background: oklch(0.15 0.01 260 / 80%);
+  border-bottom-color: oklch(1 0 0 / 8%);
+}
+.dark .glass-input {
+  background: oklch(0.2 0.01 260 / 60%);
+  border-color: oklch(1 0 0 / 10%);
+  color: oklch(0.95 0 0);
+}
+.dark body {
+  background: linear-gradient(135deg, oklch(0.12 0.02 260) 0%, oklch(0.14 0.015 270) 50%, oklch(0.12 0.01 200) 100%);
+}

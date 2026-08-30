@@ -1,176 +1,173 @@
-import { Shield, ArrowDown, Zap, Eye, FileCheck, BarChart3, AlertTriangle, CheckCircle2, Database, Cpu, Scan, Brain } from "lucide-react";
+import { Shield, Sparkles, CheckCircle2, Globe, Eye, Camera, AlertTriangle, GitBranch, ShieldCheck, BarChart3, FileText, Search, Zap, RefreshCw, MessageSquare, Target, Brain, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router";
 
-const pipelineSteps = [
-  { icon: Scan, label: "Product Image", desc: "Upload or capture product label" },
-  { icon: Cpu, label: "Image Pre-processing", desc: "Enhance, crop, normalize" },
-  { icon: Eye, label: "OCR / Vision Model", desc: "Gemini 2.0 Flash text extraction" },
-  { icon: Database, label: "Text Extraction", desc: "Structured field detection" },
-  { icon: Brain, label: "Field Detection", desc: "Declaration identification" },
-  { icon: Shield, label: "Rule Engine", desc: "Compliance validation" },
-  { icon: BarChart3, label: "Compliance Analysis", desc: "Violation detection" },
-  { icon: AlertTriangle, label: "Risk Score", desc: "AI Compliance Risk Score" },
-  { icon: CheckCircle2, label: "Inspector Review", desc: "Human verification" },
-  { icon: FileCheck, label: "Report", desc: "Digital inspection report" },
+const features = [
+  { icon: GitBranch, title: "AI Evidence Chain", desc: "Every finding traces back through: Image → Region → OCR → Field → Rule → Validation → Finding", tier: "Core" },
+  { icon: Eye, title: "Multi-View Analysis", desc: "Upload Front, Back, Left, Right, Top, Bottom views — AI merges all into one unified inspection", tier: "Core" },
+  { icon: Target, title: "Missing vs Unreadable", desc: "Distinguishes between Detected, Uncertain, Not Detected, and Image Insufficient", tier: "Core" },
+  { icon: Camera, title: "Adaptive Recapture", desc: "Detects blur, glare, low-light and recommends specific recapture instructions", tier: "Core" },
+  { icon: Globe, title: "E-Commerce Comparison", desc: "Compare physical package against online listing for MRP, quantity, manufacturer discrepancies", tier: "Core" },
+  { icon: RefreshCw, title: "Smart Revalidation", desc: "After inspector corrections, automatically re-runs affected compliance rules", tier: "Core" },
+  { icon: ShieldCheck, title: "Risk Prioritization", desc: "Transparent AI risk scoring with factor breakdown — not legal classification", tier: "Core" },
+  { icon: MessageSquare, title: "Human-in-the-Loop", desc: "Inspector can correct AI values, with full audit trail of changes", tier: "Core" },
+  { icon: AlertTriangle, title: "Label Anomaly Detection", desc: "Experimental: detects sticker overlays, covered text, typography inconsistencies", tier: "Advanced" },
+  { icon: BarChart3, title: "AI vs Inspector Analytics", desc: "Correction rates, confidence distribution, recapture success metrics", tier: "Analytics" },
+  { icon: Search, title: "Smart Inspector Search", desc: "Natural-language search: \"high risk inspections\", \"MRP discrepancies\"", tier: "Search" },
+  { icon: FileText, title: "Evidence-First Reports", desc: "PDF export with finding → evidence → rule → confidence → decision chain", tier: "Reports" },
 ];
 
 export default function About() {
+  const navigate = useNavigate();
+
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-sm font-medium text-gray-500">About</p>
-        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">System Overview</h1>
-      </div>
-
-      {/* Live AI indicator */}
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 w-fit">
-        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-        <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">Live AI Integration Active</span>
-      </div>
-
-      {/* Problem & Solution */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="glass-card rounded-2xl p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-500 mb-4">
-            <AlertTriangle className="h-5 w-5" />
+    <div className="max-w-4xl mx-auto space-y-8">
+      {/* Hero */}
+      <div className="glass-card rounded-2xl p-6 sm:p-8 text-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-indigo-500/5" />
+        <div className="relative">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-xl mx-auto mb-4">
+            <Shield className="h-8 w-8" />
           </div>
-          <h2 className="text-base font-bold text-gray-900">The Problem</h2>
-          <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-            Manual label inspection for Legal Metrology compliance is time-consuming,
-            inconsistent, and difficult to scale. Inspectors must manually verify dozens
-            of mandatory declarations on every product, leading to human error and delays.
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">MetrologyAI</h1>
+          <p className="mt-2 text-sm text-gray-500 max-w-lg mx-auto">
+            AI-Assisted Legal Metrology Label Compliance Inspection System
           </p>
-        </div>
-        <div className="glass-card rounded-2xl p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-500 mb-4">
-            <CheckCircle2 className="h-5 w-5" />
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
+            <span className="text-[10px] font-bold text-blue-600">SIH PS26034</span>
+            <span className="text-[10px] text-gray-400">•</span>
+            <span className="text-[10px] text-gray-500">Smart India Hackathon 2026</span>
           </div>
-          <h2 className="text-base font-bold text-gray-900">Our Solution</h2>
-          <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-            MetrologyAI uses OpenAI GPT-4o Vision for real OCR and text extraction, combined with a
-            configurable compliance rule engine. Inspectors upload a product label image and receive
-            instant, explainable AI analysis with evidence, enabling faster and more consistent inspections.
-          </p>
         </div>
       </div>
 
-      {/* How It Works */}
-      <div className="glass-card rounded-2xl p-6">
-        <h2 className="text-base font-bold text-gray-900 mb-4">How It Works</h2>
-        <div className="grid sm:grid-cols-3 gap-4">
+      {/* Problem Statement */}
+      <div className="glass-card rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Brain className="h-5 w-5 text-blue-600" />
+          <h2 className="text-lg font-bold text-gray-900">Problem Statement PS26034</h2>
+        </div>
+        <div className="space-y-3 text-sm text-gray-600 leading-relaxed">
+          <p>
+            <strong>AI-Assisted Legal Metrology Label Compliance Inspection System</strong>
+          </p>
+          <p>
+            Legal Metrology regulations in India mandate specific declarations on all packaged commodities:
+            product name, manufacturer details, net quantity, MRP, consumer care information, date of
+            manufacturing/expiry, country of origin, batch number, and more.
+          </p>
+          <p>
+            Current manual inspection processes are time-consuming, inconsistent, and prone to human error.
+            Field inspectors must physically verify each declaration against regulatory requirements —
+            a process that doesn't scale.
+          </p>
+          <p className="font-medium text-gray-800">
+            MetrologyAI uses AI-powered computer vision to automate label compliance inspection while
+            keeping the human inspector in control of every decision.
+          </p>
+        </div>
+      </div>
+
+      {/* Our Approach */}
+      <div className="glass-card rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="h-5 w-5 text-emerald-600" />
+          <h2 className="text-lg font-bold text-gray-900">Our Approach — Beyond OCR</h2>
+        </div>
+        <p className="text-sm text-gray-600 mb-4">
+          MetrologyAI is NOT just an OCR-based label checker. It is an explainable, human-in-the-loop
+          inspection intelligence platform.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
           {[
-            { step: "1", title: "Upload Label", desc: "Take a photo or upload an image of any product label. Supports JPG, PNG, and WEBP formats." },
-            { step: "2", title: "AI Analysis", desc: "Gemini 2.0 Flash reads every text region on the label, extracts declarations, and assigns confidence scores to each field." },
-            { step: "3", title: "Compliance Results", desc: "The rule engine evaluates extracted data against 12 Legal Metrology rules, showing compliant, review-required, and non-compliant fields." },
-          ].map((s) => (
-            <div key={s.step} className="p-4 rounded-xl bg-white/40 border border-white/50">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 text-white text-xs font-bold mb-3">
-                {s.step}
-              </div>
-              <h3 className="text-sm font-bold text-gray-900">{s.title}</h3>
-              <p className="mt-1 text-xs text-gray-600 leading-relaxed">{s.desc}</p>
+            "Understands multiple product views",
+            "Distinguishes missing from unreadable",
+            "Guides inspectors during image capture",
+            "Validates configurable regulatory rules",
+            "Compares physical and digital product info",
+            "Prioritizes inspection risk",
+            "Preserves evidence for audit",
+            "Keeps inspector in final control",
+          ].map((item, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+              <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+              {item}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Key Benefits */}
-      <div className="glass-card rounded-2xl p-6">
-        <h2 className="text-base font-bold text-gray-900 mb-4">Key Benefits</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[
-            "Real AI-powered OCR via Google Gemini 2.0 Flash",
-            "Structured digital evidence and audit trail",
-            "Explainable AI — understand why each flag was raised",
-            "Consistent rule-based validation across products",
-            "Digital inspection records with downloadable reports",
-            "Inspector can manually correct any extracted field",
-          ].map((b) => (
-            <div key={b} className="flex items-start gap-2 p-3 rounded-xl bg-white/40 border border-white/50">
-              <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-              <span className="text-xs font-medium text-gray-700">{b}</span>
-            </div>
-          ))}
+      {/* Features Grid */}
+      <div className="glass-card rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="h-5 w-5 text-amber-600" />
+          <h2 className="text-lg font-bold text-gray-900">20 Unique Features</h2>
         </div>
-      </div>
-
-      {/* AI Architecture Pipeline */}
-      <div className="glass-card rounded-2xl p-6">
-        <h2 className="text-base font-bold text-gray-900 mb-6">AI Architecture Pipeline</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          {pipelineSteps.map((step, i) => (
-            <div key={step.label} className="text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/20">
-                <step.icon className="h-6 w-6" />
+        <div className="grid sm:grid-cols-2 gap-3">
+          {features.map((f, i) => (
+            <div key={i} className="p-3 rounded-xl bg-white/40 border border-white/50 hover:bg-white/60 transition-colors">
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 shrink-0">
+                  <f.icon className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-gray-900">{f.title}</p>
+                    <span className="text-[8px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-bold">{f.tier}</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-0.5">{f.desc}</p>
+                </div>
               </div>
-              <p className="mt-3 text-xs font-bold text-gray-900">{step.label}</p>
-              <p className="mt-1 text-[10px] text-gray-500">{step.desc}</p>
-              {i < pipelineSteps.length - 1 && (
-                <div className="sm:hidden mt-2 text-gray-300 text-lg">→</div>
-              )}
             </div>
           ))}
         </div>
       </div>
 
       {/* Tech Stack */}
-      <div className="glass-card rounded-2xl p-6">
-        <h2 className="text-base font-bold text-gray-900 mb-4">Technology</h2>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {[
-            { label: "AI Vision", desc: "Google Gemini 2.0 Flash — OCR, text extraction, field detection" },
-            { label: "Compliance Engine", desc: "Rule-based validation against 12 Legal Metrology rules" },
-            { label: "Backend", desc: "Convex serverless actions with real-time capabilities" },
-            { label: "Frontend", desc: "React + TypeScript + Vite with Tailwind CSS" },
-            { label: "Authentication", desc: "Convex Auth with role-based access control" },
-            { label: "Explainable AI", desc: "Every violation includes why it was flagged and what to do" },
-          ].map((s) => (
-            <div key={s.label} className="flex items-start gap-3 p-3 rounded-xl bg-white/40 border border-white/50">
-              <Cpu className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-gray-800">{s.label}</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">{s.desc}</p>
-              </div>
-            </div>
-          ))}
+      <div className="glass-card rounded-2xl p-6 sm:p-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Shield className="h-5 w-5 text-purple-600" />
+          <h2 className="text-lg font-bold text-gray-900">Technology Stack</h2>
         </div>
-      </div>
-
-      {/* Security & Trust */}
-      <div className="glass-card rounded-2xl p-6">
-        <h2 className="text-base font-bold text-gray-900 mb-4">Security & Trust</h2>
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Role-Based Access", desc: "Inspector authentication and authorization" },
-            { label: "Audit Trail", desc: "Every inspection tracked with ID, timestamp, and inspector identity" },
-            { label: "Evidence Preservation", desc: "Uploaded images and detection results preserved" },
-            { label: "Manual Verification", desc: "AI assists — inspectors make final decisions" },
-            { label: "Data Integrity", desc: "Inspection records are immutable once submitted" },
-            { label: "AI Disclaimer", desc: "Clear labeling that AI is assistive, not a replacement" },
-          ].map((s) => (
-            <div key={s.label} className="flex items-start gap-3 p-3 rounded-xl bg-white/40 border border-white/50">
-              <Shield className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-gray-800">{s.label}</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">{s.desc}</p>
-              </div>
+            { name: "Gemini AI", desc: "Vision & OCR" },
+            { name: "Convex", desc: "Backend & DB" },
+            { name: "React + TS", desc: "Frontend" },
+            { name: "Tailwind CSS", desc: "Styling" },
+          ].map((t) => (
+            <div key={t.name} className="p-3 rounded-xl bg-white/40 border border-white/50 text-center">
+              <p className="text-xs font-bold text-gray-900">{t.name}</p>
+              <p className="text-[10px] text-gray-500">{t.desc}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* Disclaimer */}
-      <div className="glass-card rounded-2xl p-5 flex items-start gap-3 border border-amber-200">
-        <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-        <div>
-          <p className="text-xs font-bold text-gray-800">AI Assistance Disclaimer</p>
-          <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-            This system uses OpenAI GPT-4o Vision for real OCR and text extraction from product label images.
-            The AI analyzes the uploaded image, extracts visible text, and evaluates it against Legal Metrology
-            compliance rules. All scores and results are AI-generated assessments intended to assist, not replace,
-            authorized inspector decisions. The AI may occasionally misread text or miss declarations due to image
-            quality, font size, or label layout — always verify critical findings against the physical product.
-          </p>
+      <div className="glass-card rounded-2xl p-5 border border-amber-200 bg-amber-50/20">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-700 leading-relaxed">
+            <p className="font-bold mb-1">Prototype Disclaimer</p>
+            <p>
+              This is a hackathon prototype demonstrating AI-assisted inspection capabilities.
+              It is NOT an official government tool and should NOT be used as a substitute for
+              actual Legal Metrology compliance verification. All AI-generated results require
+              human verification.
+            </p>
+          </div>
         </div>
+      </div>
+
+      {/* CTA */}
+      <div className="text-center pb-8">
+        <button
+          onClick={() => navigate("/dashboard/new-inspection?demo=true")}
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 text-white text-sm font-bold shadow-lg shadow-green-500/20 hover:shadow-green-500/30 transition-all"
+        >
+          Try Demo Mode
+          <ArrowRight className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );

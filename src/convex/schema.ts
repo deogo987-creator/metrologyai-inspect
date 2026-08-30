@@ -2,7 +2,6 @@ import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { Infer, v } from "convex/values";
 
-// default user roles. can add / remove based on the project as needed
 export const ROLES = {
   ADMIN: "admin",
   USER: "user",
@@ -18,26 +17,68 @@ export type Role = Infer<typeof roleValidator>;
 
 const schema = defineSchema(
   {
-    // default auth tables using convex auth.
-    ...authTables, // do not remove or modify
+    ...authTables,
 
-    // the users table is the default users table that is brought in by the authTables
     users: defineTable({
-      name: v.optional(v.string()), // name of the user. do not remove
-      image: v.optional(v.string()), // image of the user. do not remove
-      email: v.optional(v.string()), // email of the user. do not remove
-      emailVerificationTime: v.optional(v.number()), // email verification time. do not remove
-      isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
+      name: v.optional(v.string()),
+      image: v.optional(v.string()),
+      email: v.optional(v.string()),
+      emailVerificationTime: v.optional(v.number()),
+      isAnonymous: v.optional(v.boolean()),
+      role: v.optional(roleValidator),
+    }).index("email", ["email"]),
 
-      role: v.optional(roleValidator), // role of the user. do not remove
-    }).index("email", ["email"]), // index for the email. do not remove or modify
+    inspections: defineTable({
+      inspectionId: v.string(),
+      productName: v.string(),
+      manufacturer: v.string(),
+      brand: v.string(),
+      category: v.string(),
+      batchNumber: v.string(),
+      mrp: v.string(),
+      inspectorId: v.string(),
+      location: v.string(),
+      dateTime: v.string(),
+      score: v.number(),
+      status: v.string(),
+      riskLevel: v.string(),
+      riskScore: v.number(),
+      fields: v.string(), // JSON stringified ExtractedField[]
+      violations: v.string(), // JSON stringified Violation[]
+      categories: v.string(), // JSON stringified ComplianceCategory[]
+      explanation: v.string(),
+      rawOcrText: v.string(),
+      recaptureRecommendations: v.string(), // JSON
+      anomalies: v.string(), // JSON
+      nextBestActions: v.string(), // JSON
+      inspectionSummary: v.string(), // JSON
+      declarationMap: v.string(), // JSON
+      auditTrail: v.string(), // JSON
+      corrections: v.string(), // JSON
+      revalidations: v.string(), // JSON
+      imageUrl: v.optional(v.string()),
+    })
+      .index("by_inspectionId", ["inspectionId"])
+      .index("by_status", ["status"])
+      .index("by_date", ["dateTime"])
+      .index("by_risk", ["riskLevel"]),
 
-    // add other tables here
-
-    // tableName: defineTable({
-    //   ...
-    //   // table fields
-    // }).index("by_field", ["field"])
+    // E-Commerce comparisons
+    ecommerceComparisons: defineTable({
+      inspectionId: v.string(),
+      physicalMrp: v.string(),
+      onlineMrp: v.string(),
+      physicalQty: v.string(),
+      onlineQty: v.string(),
+      physicalManufacturer: v.string(),
+      onlineManufacturer: v.string(),
+      physicalProductName: v.string(),
+      onlineProductName: v.string(),
+      matchStatus: v.string(),
+      discrepancies: v.string(), // JSON
+      imageUrl: v.optional(v.string()),
+      dateTime: v.string(),
+    }).index("by_inspectionId", ["inspectionId"]),
   },
   {
     schemaValidation: false,

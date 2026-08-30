@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router";
-import { useAction } from "convex/react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,6 +90,27 @@ export default function NewInspection() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const analyzeLabel = useAction(api.analyzeLabel.analyzeLabel);
+  const saveInspection = useMutation(api.inspections.saveInspection);
+  const [searchParams] = useSearchParams();
+  const isDemoMode = searchParams.get("demo") === "true";
+  const isEcommerceMode = searchParams.get("ecommerce") === "true";
+
+  // Demo mode: pre-fill product info
+  useEffect(() => {
+    if (isDemoMode) {
+      setProductInfo({
+        productName: "Britannia Good Day Biscuit",
+        manufacturer: "Britannia Industries Ltd",
+        brand: "Good Day",
+        category: "Food",
+        batchNumber: "BN-2026-08-12",
+        mrp: "₹35",
+        inspectorId: "INS-LM-042",
+        location: "Central Market, Delhi",
+        dateTime: new Date().toISOString().slice(0, 16),
+      });
+    }
+  }, [isDemoMode]);
 
   const [step, setStep] = useState<Step>(1);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -251,6 +272,42 @@ export default function NewInspection() {
       setRawOcrText(aiResult.rawOcrText || "");
       setResult(mappedResult);
       addAuditEntry("Findings Generated", `${aiResult.violations.length} violation(s), Risk: ${aiResult.riskPriority?.level || "low"}`, "ai");
+
+      // Save to database
+      try {
+        await saveInspection({
+          inspectionId: inspectionId.current,
+          productName: productInfo.productName,
+          manufacturer: productInfo.manufacturer,
+          brand: productInfo.brand,
+          category: productInfo.category,
+          batchNumber: productInfo.batchNumber,
+          mrp: productInfo.mrp,
+          inspectorId: productInfo.inspectorId,
+          location: productInfo.location,
+          dateTime: productInfo.dateTime,
+          score: aiResult.score,
+          status: aiResult.status,
+          riskLevel: aiResult.riskPriority?.level || "low",
+          riskScore: aiResult.riskPriority?.score || 0,
+          fields: JSON.stringify(mappedResult.fields),
+          violations: JSON.stringify(mappedResult.violations),
+          categories: JSON.stringify(mappedResult.categories),
+          explanation: mappedResult.explanation,
+          rawOcrText: aiResult.rawOcrText || "",
+          recaptureRecommendations: JSON.stringify(mappedResult.recaptureRecommendations),
+          anomalies: JSON.stringify(mappedResult.anomalies),
+          nextBestActions: JSON.stringify(mappedResult.nextBestActions),
+          inspectionSummary: JSON.stringify(mappedResult.inspectionSummary),
+          declarationMap: JSON.stringify(mappedResult.declarationMap),
+          auditTrail: JSON.stringify(auditTrail),
+          corrections: JSON.stringify(corrections),
+          revalidations: JSON.stringify(revalidations),
+        });
+        addAuditEntry("Inspection Saved", `ID: ${inspectionId.current}`, "system");
+      } catch (saveErr) {
+        console.warn("Failed to save inspection:", saveErr);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Analysis failed.";
       setError(message);

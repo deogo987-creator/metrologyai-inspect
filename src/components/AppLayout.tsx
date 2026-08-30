@@ -12,7 +12,7 @@ import {
   Info,
   BarChart3,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -27,6 +27,18 @@ const navItems = [
 export default function AppLayout() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("metrology-dark-mode") === "true" ||
+        (!localStorage.getItem("metrology-dark-mode") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("metrology-dark-mode", String(darkMode));
+  }, [darkMode]);
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
@@ -68,7 +80,7 @@ export default function AppLayout() {
       </nav>
 
       {/* User section */}
-      <div className="border-t border-white/30 p-4">
+      <div className="border-t border-white/30 p-4 space-y-2">
         <div className="flex items-center gap-3 rounded-xl bg-white/40 px-3 py-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white text-xs font-bold">
             <User className="h-4 w-4" />
@@ -82,6 +94,17 @@ export default function AppLayout() {
             </p>
           </div>
         </div>
+        <button
+          onClick={() => setDarkMode(!darkMode)}
+          className="w-full flex items-center gap-3 rounded-xl bg-white/40 px-3 py-2.5 text-left hover:bg-white/60 transition-colors"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
+            {darkMode ? "☀️" : "🌙"}
+          </div>
+          <span className="text-xs font-medium text-gray-600">
+            {darkMode ? "Light Mode" : "Dark Mode"}
+          </span>
+        </button>
       </div>
     </div>
   );
