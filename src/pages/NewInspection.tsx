@@ -170,8 +170,11 @@ export default function NewInspection() {
         const viewOrder: ProductView[] = ["front", "back", "left", "right", "top", "bottom"];
         const nextView = viewOrder.find((v) => !existingViews.includes(v) && !newViews.includes(v)) || "other";
         newViews.push(nextView);
+        // Try to pre-compress for faster analysis, but don't block upload
         compressImage(file).then((compressed) => {
           compressedCache[preview] = compressed;
+        }).catch(() => {
+          // Compression failed, will use FileReader fallback during analysis
         });
       }
     }
@@ -218,24 +221,20 @@ export default function NewInspection() {
       setProcessingStage("Preparing images for analysis...");
       const images = await Promise.all(
         imageFiles.map(async (file, i) => {
-          try {
-            const cached = compressedCache[imagePreviews[i]];
-            const base64 = cached || (await compressImage(file));
-            if (!base64) throw new Error(`Failed to compress image ${i + 1}`);
-            return { base64, view: imageViews[i] || "front" };
-          } catch (err) {
-            // Fallback: read file directly as base64
-            return new Promise<{ base64: string; view: string }>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const result = reader.result as string;
-                if (result) resolve({ base64: result, view: imageViews[i] || "front" });
-                else reject(new Error(`Failed to read image ${i + 1}`));
-              };
-              reader.onerror = () => reject(new Error(`Failed to read image ${i + 1}`));
-              reader.readAsDataURL(file);
-            });
-          }
+          // Always read file directly as base64 - most reliable method
+          return new Promise<{ base64: string; view: string }>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const result = reader.result as string;
+              if (result && result.startsWith("data:image")) {
+                resolve({ base64: result, view: imageViews[i] || "front" });
+              } else {
+                reject(new Error(`Image ${i + 1} could not be read. Please try a different image.`));
+              }
+            };
+            reader.onerror = () => reject(new Error(`Image ${i + 1} failed to load. The file may be corrupted.`));
+            reader.readAsDataURL(file);
+          });
         })
       );
 
