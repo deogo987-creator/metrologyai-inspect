@@ -842,12 +842,12 @@ export const analyzeLabel = action({
     }
 
     // Anomalies
-    const anomalies = (extraction.anomalies || []).map((a, i) => ({
+    const anomalies = (extraction.anomalies || []).filter(a => a && typeof a === "object").map((a, i) => ({
       id: `anomaly-${i + 1}`,
-      type: a.type,
+      type: a.type || "unknown",
       confidence: a.confidence || 50,
       region: a.region || { x: 0, y: 0, width: 0, height: 0 },
-      description: a.description || `Potential ${a.type.replace(/-/g, " ")} detected`,
+      description: a.description || `Potential ${String(a.type || "unknown").replace(/-/g, " ")} detected`,
       severity: (a.confidence || 50) >= 70 ? "high" : (a.confidence || 50) >= 40 ? "medium" : "low",
       status: "detected" as const,
     }));
