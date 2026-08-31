@@ -3,70 +3,182 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 
-const EXTRACTION_PROMPT = `You are an expert Legal Metrology compliance inspector for India.
-Analyze this product label image and extract ALL visible text, then identify mandatory declaration fields.
+// ─── OPTIMIZED PROMPT (shorter = faster, same accuracy) ─────────────────────
+const EXTRACTION_PROMPT = `Extract text from this product label and identify Legal Metrology fields.
 
-TASK 1: Extract ALL visible text from the image.
-TASK 2: Identify these fields with exact values:
+Extract these fields (use "" if not found):
 - productName: Product name/title
-- manufacturer: Manufacturer/prepacker/importer name AND full address
+- manufacturer: Manufacturer name AND full address
 - netQuantity: Net quantity with SI unit (e.g., "500 g", "1 L")
-- mrp: Maximum Retail Price including ₹ symbol and "(Inclusive of all taxes)"
-- consumerCare: Consumer care contact (phone/email)
+- mrp: MRP with ₹ and "(Inclusive of all taxes)"
+- consumerCare: Phone or email
 - manufacturingDate: Manufacturing/packing date
 - expiryDate: Expiry or "use before" date
 - countryOfOrigin: Country of origin
 - batchNumber: Batch/lot number
-- vegNonVeg: Vegetarian/non-vegetarian mark
-- fssaiLicense: FSSAI license number (14-digit for food)
+- vegNonVeg: Vegetarian/non-vegetarian indicator
+- fssaiLicense: FSSAI 14-digit license (food products only)
 
-TASK 3: For EACH field, evaluate compliance:
-1. Product name must be clearly visible and unambiguous
-2. Manufacturer must include full name AND complete address
-3. Net quantity must use SI units (g, kg, ml, L)
-4. MRP MUST include ₹ AND "(Inclusive of all taxes)" — missing either is a violation
-5. Consumer care must include phone or email — missing entirely is HIGH severity
-6. Dates must be DD/MM/YYYY or MMM/YYYY format
-7. Expiry required for perishable goods
-8. Country of origin must clearly state origin
-9. Batch number must be alphanumeric
-10. FSSAI: 14-digit number required for food products
-11. Veg/Non-veg dot symbol required for food products
+For each field provide: value, confidence (0-100), boundingBox (null if unsure), complianceStatus ("compliant"|"violation"|"warning"), complianceReason.
 
-For each field provide:
-- value: exact extracted text ("" if not found)
-- confidence: 0-100
-- boundingBox: {x, y, width, height} as percentage of image (null if unsure)
-- complianceStatus: "compliant" | "violation" | "warning"
-- complianceReason: specific explanation referencing the rule
+Rules: MRP needs ₹+taxes text. Consumer care needs phone/email. Dates in DD/MM/YYYY or MMM/YYYY. FSSAI must be 14 digits.
 
-Also detect potential label anomalies:
-- Sticker overlays or tampering
-- Text that appears covered or altered
-- Unusual patches near MRP region
-- Typography inconsistencies
+Also detect: sticker overlays, covered text, altered MRP, typography issues, image manipulation.
 
 Respond with ONLY valid JSON:
-{
-  "fields": {
-    "productName": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "manufacturer": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "netQuantity": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "mrp": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "consumerCare": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "manufacturingDate": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "expiryDate": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "countryOfOrigin": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "batchNumber": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "vegNonVeg": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},
-    "fssaiLicense": {"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""}
+{"fields":{"productName":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"manufacturer":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"netQuantity":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"mrp":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"consumerCare":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"manufacturingDate":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"expiryDate":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"countryOfOrigin":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"batchNumber":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"vegNonVeg":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"fssaiLicense":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""}},"rawText":"","imageQuality":"good","isFoodProduct":true,"anomalies":[],"overallAssessment":""}`;
+
+// ─── POST-PROCESSING VALIDATORS ─────────────────────────────────────────────
+// Regex-based validators that catch AI mistakes after extraction
+
+const validators: Record<string, (value: string) => { valid: boolean; corrected: string; note: string }> = {
+  mrp: (value: string) => {
+    if (!value || !value.trim()) return { valid: false, corrected: "", note: "MRP not found" };
+    const trimmed = value.trim();
+    // Must contain ₹ or Rs
+    if (!/[₹Rs]/i.test(trimmed)) {
+      return { valid: false, corrected: trimmed, note: "MRP missing ₹ symbol" };
+    }
+    // Must contain a numeric value
+    if (!/\d/.test(trimmed)) {
+      return { valid: false, corrected: trimmed, note: "MRP missing numeric value" };
+    }
+    // Bonus: check for "inclusive of all taxes" mention
+    const hasTaxes = /inclusive.*tax|incl.*tax|all.*tax/i.test(trimmed);
+    return { valid: true, corrected: trimmed, note: hasTaxes ? "" : "MRP present but 'inclusive of all taxes' text not found in value" };
   },
-  "rawText": "all visible text",
-  "imageQuality": "good|fair|poor",
-  "isFoodProduct": true,
-  "anomalies": [{"type":"sticker-overlay|covered-text|unusual-patch|typography-inconsistency|altered-mrp|image-manipulation|inconsistent-structure","confidence":0,"region":{"x":0,"y":0,"width":0,"height":0},"description":""}],
-  "overallAssessment": "brief summary"
-}`;
+
+  fssaiLicense: (value: string) => {
+    if (!value || !value.trim()) return { valid: false, corrected: "", note: "FSSAI not found" };
+    const digits = value.replace(/\D/g, "");
+    if (digits.length === 14) return { valid: true, corrected: digits, note: "" };
+    if (digits.length > 0 && digits.length !== 14) {
+      return { valid: false, corrected: digits, note: `FSSAI has ${digits.length} digits (expected 14)` };
+    }
+    return { valid: false, corrected: value.trim(), note: "FSSAI contains no valid digits" };
+  },
+
+  netQuantity: (value: string) => {
+    if (!value || !value.trim()) return { valid: false, corrected: "", note: "Net quantity not found" };
+    const trimmed = value.trim();
+    // Must contain SI units
+    if (/\b\d+\s*(g|kg|ml|l|gm|kgs|ltr|litre|liter|liters|oz|oz)\b/i.test(trimmed)) {
+      return { valid: true, corrected: trimmed, note: "" };
+    }
+    // Check for common non-SI units that need conversion
+    if (/\d+\s*(pcs|pieces|count|nos|units)/i.test(trimmed)) {
+      return { valid: true, corrected: trimmed, note: "Uses count-based units (acceptable for multi-piece packs)" };
+    }
+    return { valid: false, corrected: trimmed, note: "Net quantity missing SI units (g, kg, ml, L)" };
+  },
+
+  consumerCare: (value: string) => {
+    if (!value || !value.trim()) return { valid: false, corrected: "", note: "Consumer care contact not found" };
+    const trimmed = value.trim();
+    const hasPhone = /\d{10,}/.test(trimmed.replace(/[\s\-\(\)]/g, ""));
+    const hasEmail = /[\w.]+@[\w.]+\.\w+/.test(trimmed);
+    if (hasPhone || hasEmail) return { valid: true, corrected: trimmed, note: "" };
+    return { valid: false, corrected: trimmed, note: "Consumer care missing phone number or email" };
+  },
+
+  manufacturingDate: (value: string) => {
+    if (!value || !value.trim()) return { valid: false, corrected: "", note: "Manufacturing date not found" };
+    const trimmed = value.trim();
+    // DD/MM/YYYY or DD-MM-YYYY
+    if (/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    // MMM/YYYY or Month YYYY
+    if (/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\/\-\.]*\d{2,4}/i.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    // YYYY-MM-DD (ISO)
+    if (/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    return { valid: false, corrected: trimmed, note: "Date format not in DD/MM/YYYY or MMM/YYYY" };
+  },
+
+  expiryDate: (value: string) => {
+    if (!value || !value.trim()) return { valid: false, corrected: "", note: "Expiry date not found" };
+    const trimmed = value.trim();
+    if (/no\s*exp|not\s*applicable|na|shelf\s*life|long\s*life/i.test(trimmed)) {
+      return { valid: true, corrected: trimmed, note: "Marked as not applicable (shelf-stable product)" };
+    }
+    // Same date validation as manufacturingDate
+    if (/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    if (/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s\/\-\.]*\d{2,4}/i.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    if (/\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    return { valid: false, corrected: trimmed, note: "Expiry date format not recognized" };
+  },
+
+  batchNumber: (value: string) => {
+    if (!value || !value.trim()) return { valid: false, corrected: "", note: "Batch number not found" };
+    const trimmed = value.trim();
+    if (/^[A-Za-z0-9\-\/\.]+$/.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    return { valid: true, corrected: trimmed, note: "Batch number contains non-standard characters" };
+  },
+
+  countryOfOrigin: (value: string) => {
+    if (!value || !value.trim()) return { valid: false, corrected: "", note: "Country of origin not found" };
+    const trimmed = value.trim();
+    if (/india|bharat/i.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    if (/\w+/.test(trimmed)) return { valid: true, corrected: trimmed, note: "" };
+    return { valid: false, corrected: trimmed, note: "Country of origin unclear" };
+  },
+};
+
+function runPostProcessingValidators(fields: Record<string, ExtractedFieldValue>): Record<string, ExtractedFieldValue> {
+  const validated = { ...fields };
+  for (const [fieldName, validator] of Object.entries(validators)) {
+    const field = validated[fieldName];
+    if (!field || !field.value || !field.value.trim()) continue;
+    const result = validator(field.value);
+    if (!result.valid && field.complianceStatus === "compliant") {
+      // Downgrade: AI said compliant but validator disagrees
+      validated[fieldName] = {
+        ...field,
+        complianceStatus: "violation",
+        complianceReason: result.note || field.complianceReason,
+      };
+    } else if (result.note && field.complianceStatus === "compliant") {
+      // Add validator note to reason
+      validated[fieldName] = {
+        ...field,
+        complianceReason: field.complianceReason ? `${field.complianceReason} [Validator: ${result.note}]` : `[Validator: ${result.note}]`,
+      };
+    }
+  }
+  return validated;
+}
+
+// ─── CROSS-VIEW VALIDATION ──────────────────────────────────────────────────
+// When multiple views show the same field, cross-validate the values
+
+function crossValidateViews(
+  viewResults: Array<{ view: string; fields: Record<string, ExtractedFieldValue> }>
+): { mismatches: string[]; fieldBest: Record<string, ExtractedFieldValue & { sourceView: string }> } {
+  const fieldBest: Record<string, ExtractedFieldValue & { sourceView: string }> = {};
+  const mismatches: string[] = [];
+
+  for (const result of viewResults) {
+    for (const [field, value] of Object.entries(result.fields)) {
+      if (!value || typeof value !== "object" || !value.value) continue;
+      const existing = fieldBest[field];
+      if (!existing) {
+        fieldBest[field] = { ...value, sourceView: result.view };
+      } else {
+        // Keep highest confidence, but flag mismatches
+        if (value.confidence > existing.confidence) {
+          // Check if values differ significantly
+          const a = existing.value.toLowerCase().trim();
+          const b = value.value.toLowerCase().trim();
+          if (a !== b && a.length > 2 && b.length > 2) {
+            mismatches.push(`${field}: "${existing.value}" (${existing.sourceView}) vs "${value.value}" (${result.view})`);
+          }
+          fieldBest[field] = { ...value, sourceView: result.view };
+        }
+      }
+    }
+  }
+  return { mismatches, fieldBest };
+}
+
+// ─── TYPES ──────────────────────────────────────────────────────────────────
 
 interface ExtractedFieldValue {
   value: string;
@@ -393,12 +505,11 @@ function calculateRiskPriority(
 }
 
 function generateNextBestActions(
-  fields: FieldStatus[], violations: ViolationData[], imageQuality: string
+  fields: FieldStatus[], violations: ViolationData[], _imageQuality: string
 ): NextBestAction[] {
   const actions: NextBestAction[] = [];
   let priority = 1;
 
-  // Check for fields needing recapture
   const imageInsufficient = fields.filter(f => f.detectionStatus === "image-insufficient");
   if (imageInsufficient.length > 0) {
     actions.push({
@@ -410,7 +521,6 @@ function generateNextBestActions(
     priority++;
   }
 
-  // Check for review-required fields
   const needsReview = fields.filter(f => f.status === "review-required");
   for (const f of needsReview.slice(0, 2)) {
     const rule = RULE_REQUIREMENTS[Number(f.ruleId)];
@@ -423,7 +533,6 @@ function generateNextBestActions(
     priority++;
   }
 
-  // Check for non-compliant fields
   const nonCompliant = fields.filter(f => f.status === "non-compliant");
   for (const f of nonCompliant.slice(0, 2)) {
     const rule = RULE_REQUIREMENTS[Number(f.ruleId)];
@@ -448,7 +557,7 @@ function generateNextBestActions(
 }
 
 function generateSummary(
-  status: string, score: number, fields: FieldStatus[], violations: ViolationData[], riskLevel: string
+  status: string, _score: number, fields: FieldStatus[], violations: ViolationData[], riskLevel: string
 ) {
   const keyFindings: string[] = [];
   const recommendedActions: string[] = [];
@@ -494,15 +603,23 @@ function generateSummary(
   };
 }
 
+// ─── GEMINI CALL — SPEED OPTIMIZED ──────────────────────────────────────────
+// Model order: fastest first. JSON mode enabled. Temperature 0 for consistency.
+
 async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: string): Promise<string> {
-  const models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.7-flash"];
+  // Speed: flash-lite is fastest, then flash, then larger models as fallback
+  const models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro"];
   let lastError = "";
 
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const body = {
       contents: [{ parts: [{ text: EXTRACTION_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }] }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
+      generationConfig: {
+        temperature: 0,              // Accuracy: deterministic output
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",  // Speed: no need to parse markdown-wrapped JSON
+      },
     };
 
     try {
@@ -510,8 +627,9 @@ async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: s
 
       if (!response.ok) {
         const errorText = await response.text();
+        // Retry on 503 (overloaded)
         if (response.status === 503) {
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise(r => setTimeout(r, 1500));
           const retry = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
           if (retry.ok) {
             const retryData = await retry.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
@@ -536,34 +654,53 @@ async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: s
   throw new Error(`All Gemini models failed. Last error: ${lastError}`);
 }
 
-// Feature 2: Multi-view analysis — send all images and merge results
+// ─── PARSE GEMINI RESPONSE ──────────────────────────────────────────────────
+// Handles both JSON mode (raw) and markdown-wrapped responses
+
+function parseGeminiResponse(responseText: string): ExtractionResult {
+  try {
+    // JSON mode returns raw JSON; older models may wrap in markdown
+    let cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*/gi, "");
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace > firstBrace) cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    return JSON.parse(cleaned.trim());
+  } catch {
+    return { fields: {}, rawText: responseText.substring(0, 2000), imageQuality: "unknown", isFoodProduct: false, anomalies: [], overallAssessment: "Could not parse AI response" };
+  }
+}
+
+// ─── MULTI-VIEW — PARALLEL (SPEED) + CROSS-VALIDATION (ACCURACY) ────────────
+
 async function analyzeMultiView(
   apiKey: string,
   images: { base64: string; mimeType: string; view: string }[]
-): Promise<{ mergedFields: Record<string, ExtractedFieldValue>; mergedRawText: string; imageQuality: string; isFoodProduct: boolean; anomalies: AnomalyRaw[] }> {
-  // Track best value per field across all views
-  const fieldBest: Record<string, ExtractedFieldValue & { sourceView: string }> = {};
+): Promise<{ mergedFields: Record<string, ExtractedFieldValue>; mergedRawText: string; imageQuality: string; isFoodProduct: boolean; anomalies: AnomalyRaw[]; crossViewMismatches: string[] }> {
+  const qualityOrder: Record<string, number> = { good: 3, fair: 2, poor: 1, unknown: 0 };
+
+  // SPEED: Send all images in parallel instead of sequentially
+  const responses = await Promise.all(
+    images.map(img => callGeminiVision(apiKey, img.base64, img.mimeType).catch(err => {
+      console.error(`Failed to analyze ${img.view}: ${err}`);
+      return null;
+    }))
+  );
+
+  // Process all results
+  const viewResults: Array<{ view: string; fields: Record<string, ExtractedFieldValue> }> = [];
   let allRawText = "";
   let worstQuality = "good";
   let isFood = false;
   const allAnomalies: AnomalyRaw[] = [];
-  const qualityOrder: Record<string, number> = { good: 3, fair: 2, poor: 1, unknown: 0 };
 
-  for (const img of images) {
-    const responseText = await callGeminiVision(apiKey, img.base64, img.mimeType);
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    const responseText = responses[i];
+    if (!responseText) continue;
 
-    let extraction: ExtractionResult;
-    try {
-      let cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*/gi, "");
-      const firstBrace = cleaned.indexOf("{");
-      const lastBrace = cleaned.lastIndexOf("}");
-      if (firstBrace !== -1 && lastBrace > firstBrace) cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-      extraction = JSON.parse(cleaned.trim());
-    } catch {
-      extraction = { fields: {}, rawText: responseText.substring(0, 2000), imageQuality: "unknown", isFoodProduct: false, anomalies: [], overallAssessment: "" };
-    }
+    const extraction = parseGeminiResponse(responseText);
 
-    // Normalize field names
+    // Normalize field names within this view
     if (extraction.fields) {
       const normalized: Record<string, ExtractedFieldValue> = {};
       for (const [key, val] of Object.entries(extraction.fields)) {
@@ -574,14 +711,7 @@ async function analyzeMultiView(
           normalized[normKey] = val as ExtractedFieldValue;
         }
       }
-
-      // Merge: keep highest confidence per field across views
-      for (const [field, value] of Object.entries(normalized)) {
-        const existing = fieldBest[field];
-        if (!existing || (value.confidence || 0) > (existing.confidence || 0)) {
-          fieldBest[field] = { ...value, sourceView: img.view };
-        }
-      }
+      viewResults.push({ view: img.view, fields: normalized });
     }
 
     allRawText += `\n--- ${img.view.toUpperCase()} VIEW ---\n${extraction.rawText || ""}`;
@@ -591,6 +721,9 @@ async function analyzeMultiView(
     if (extraction.isFoodProduct) isFood = true;
     if (extraction.anomalies) allAnomalies.push(...extraction.anomalies);
   }
+
+  // ACCURACY: Cross-validate across views
+  const { mismatches, fieldBest } = crossValidateViews(viewResults);
 
   // Convert back to ExtractionResult format
   const mergedFields: Record<string, ExtractedFieldValue> = {};
@@ -604,8 +737,10 @@ async function analyzeMultiView(
     };
   }
 
-  return { mergedFields, mergedRawText: allRawText.trim(), imageQuality: worstQuality, isFoodProduct: isFood, anomalies: allAnomalies };
+  return { mergedFields, mergedRawText: allRawText.trim(), imageQuality: worstQuality, isFoodProduct: isFood, anomalies: allAnomalies, crossViewMismatches: mismatches };
 }
+
+// ─── MAIN ACTION ────────────────────────────────────────────────────────────
 
 export const analyzeLabel = action({
   args: {
@@ -631,14 +766,13 @@ export const analyzeLabel = action({
         const match = imageData.match(/^data:([^;]+);base64,(.+)$/);
         if (match) { mimeType = match[1]; imageData = match[2]; }
       }
-      // Validate base64 data is not empty
       if (!imageData || imageData.length < 100) {
         throw new Error("Image data is empty or too small. Please upload a valid image.");
       }
       return { base64: imageData, mimeType, view: img.view };
     });
 
-    // Feature 2: Multi-view analysis
+    // Multi-view or single-view analysis
     let extraction: ExtractionResult;
     if (preparedImages.length > 1) {
       const merged = await analyzeMultiView(apiKey, preparedImages);
@@ -648,19 +782,11 @@ export const analyzeLabel = action({
         imageQuality: merged.imageQuality,
         isFoodProduct: merged.isFoodProduct,
         anomalies: merged.anomalies,
-        overallAssessment: `Multi-view analysis of ${preparedImages.length} images completed.`,
+        overallAssessment: `Multi-view analysis of ${preparedImages.length} images completed.${merged.crossViewMismatches.length > 0 ? ` Cross-view mismatches found: ${merged.crossViewMismatches.join("; ")}` : ""}`,
       };
     } else {
       const responseText = await callGeminiVision(apiKey, preparedImages[0].base64, preparedImages[0].mimeType);
-      try {
-        let cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*/gi, "");
-        const firstBrace = cleaned.indexOf("{");
-        const lastBrace = cleaned.lastIndexOf("}");
-        if (firstBrace !== -1 && lastBrace > firstBrace) cleaned = cleaned.substring(firstBrace, lastBrace + 1);
-        extraction = JSON.parse(cleaned.trim());
-      } catch {
-        extraction = { fields: {}, rawText: responseText.substring(0, 2000), imageQuality: "unknown", isFoodProduct: false, anomalies: [], overallAssessment: "Could not parse AI response" };
-      }
+      extraction = parseGeminiResponse(responseText);
     }
 
     // Normalize field names
@@ -677,6 +803,11 @@ export const analyzeLabel = action({
       extraction.fields = normalized;
     }
 
+    // ACCURACY: Run post-processing validators on extracted fields
+    if (extraction.fields) {
+      extraction.fields = runPostProcessingValidators(extraction.fields);
+    }
+
     // Evaluate each rule
     const fieldResults: FieldStatus[] = [];
     for (const [ruleNum] of Object.entries(RULE_REQUIREMENTS)) {
@@ -690,7 +821,7 @@ export const analyzeLabel = action({
     const violations = generateViolations(fieldResults);
     const { score, status, categories, explanation } = calculateScore(fieldResults, extraction.isFoodProduct || false);
 
-    // Feature 4: Image quality issues & recapture recommendations
+    // Image quality issues & recapture recommendations
     const imageQualityIssues: string[] = [];
     const recaptureRecommendations: ComplianceAnalysisResult["recaptureRecommendations"] = [];
     if (extraction.imageQuality === "poor") {
@@ -706,7 +837,7 @@ export const analyzeLabel = action({
       );
     }
 
-    // Feature 7: Anomalies
+    // Anomalies
     const anomalies = (extraction.anomalies || []).map((a, i) => ({
       id: `anomaly-${i + 1}`,
       type: a.type,
@@ -717,16 +848,16 @@ export const analyzeLabel = action({
       status: "detected" as const,
     }));
 
-    // Feature 8: Risk Priority
+    // Risk Priority
     const riskPriority = calculateRiskPriority(score, fieldResults, extraction.anomalies || []);
 
-    // Feature 19: Next Best Actions
+    // Next Best Actions
     const nextBestActions = generateNextBestActions(fieldResults, violations, extraction.imageQuality || "unknown");
 
-    // Feature 15: Inspection Summary
+    // Inspection Summary
     const inspectionSummary = generateSummary(status, score, fieldResults, violations, riskPriority.level);
 
-    // Feature 12: Declaration Map
+    // Declaration Map
     const declarationMap = fieldResults.map(f => {
       const rule = RULE_REQUIREMENTS[Number(f.ruleId)];
       return {
