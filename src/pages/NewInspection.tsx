@@ -185,10 +185,17 @@ export default function NewInspection() {
   }, [imageViews]);
 
   const removeImage = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImageFiles((prev) => {
+      const removed = prev[index];
+      if (removed) {
+        const cacheKey = `${removed.name}-${removed.size}-${removed.lastModified}`;
+        delete compressedCache[cacheKey];
+      }
+      return prev.filter((_, i) => i !== index);
+    });
     setImagePreviews((prev) => {
       const url = prev[index];
-      if (url) { URL.revokeObjectURL(url); delete compressedCache[url]; }
+      if (url) URL.revokeObjectURL(url);
       return prev.filter((_, i) => i !== index);
     });
     setContentViews((prev) => prev.filter((_, i) => i !== index));
@@ -221,18 +228,44 @@ export default function NewInspection() {
       setProcessingStage("Preparing images for analysis...");
       const images = await Promise.all(
         imageFiles.map(async (file, i) => {
-          // Always read file directly as base64 - most reliable method
+          // Validate file before reading
+          if (!file || file.size === 0) {
+            throw new Error(`Image ${i + 1} is empty. Please upload a valid image.`);
+          }
+          if (file.size > 20 * 1024 * 1024) {
+            throw new Error(`Image ${i + 1} is too large (${Math.round(file.size / 1024 / 1024)}MB). Maximum is 20MB.`);
+          }
+          // Try compressed version first (faster upload, smaller payload)
+          const cacheKey = `${file.name}-${file.size}-${file.lastModified}`;
+          const cached = compressedCache[cacheKey];
+          if (cached) {
+            return { base64: cached, view: imageViews[i] || "front" };
+          }
+          // Try compression
+          try {
+            const compressed = await compressImage(file);
+            compressedCache[cacheKey] = compressed;
+            return { base64: compressed, view: imageViews[i] || "front" };
+          } catch {
+            // Compression failed, fall back to direct read
+          }
+          // Fallback: read file directly as base64 with timeout
           return new Promise<{ base64: string; view: string }>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error(`Image ${i + 1} took too long to read. The file may be corrupted.`)), 15000);
             const reader = new FileReader();
             reader.onload = () => {
+              clearTimeout(timeout);
               const result = reader.result as string;
-              if (result && result.startsWith("data:image")) {
+              if (result && result.startsWith("data:image") && result.length > 200) {
                 resolve({ base64: result, view: imageViews[i] || "front" });
               } else {
                 reject(new Error(`Image ${i + 1} could not be read. Please try a different image.`));
               }
             };
-            reader.onerror = () => reject(new Error(`Image ${i + 1} failed to load. The file may be corrupted.`));
+            reader.onerror = () => {
+              clearTimeout(timeout);
+              reject(new Error(`Image ${i + 1} failed to load. Please try a different image or format (JPEG/PNG recommended).`));
+            };
             reader.readAsDataURL(file);
           });
         })
