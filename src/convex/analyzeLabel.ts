@@ -607,9 +607,11 @@ function generateSummary(
 // Model order: fastest first. JSON mode enabled. Temperature 0 for consistency.
 
 async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: string): Promise<string> {
-  // Speed: flash is fastest, then flash-lite, then pro as fallback
-  // Only models available to ALL users (not "no longer available to new users")
-  const models = ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"];
+  // Currently available Gemini models (as of Aug 2026)
+  // gemini-2.0-flash: SHUT DOWN
+  // gemini-2.5-flash/pro: no longer available to new users
+  // Only use 3.x models which are GA and available to all users
+  const models = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash"];
   const bodyBase = {
     contents: [{ parts: [{ text: EXTRACTION_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }] }],
     generationConfig: {
