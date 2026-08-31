@@ -607,20 +607,22 @@ function generateSummary(
 // Model order: fastest first. JSON mode enabled. Temperature 0 for consistency.
 
 async function callGeminiVision(apiKey: string, imageBase64: string, mimeType: string): Promise<string> {
-  // Speed: flash-lite is fastest, then flash, then larger models as fallback
-  const models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro"];
+  // Speed: flash is fastest, then flash-lite, then pro as fallback
+  // Only models available to ALL users (not "no longer available to new users")
+  const models = ["gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"];
+  const bodyBase = {
+    contents: [{ parts: [{ text: EXTRACTION_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }] }],
+    generationConfig: {
+      temperature: 0,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+    },
+  };
   let lastError = "";
 
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const body = {
-      contents: [{ parts: [{ text: EXTRACTION_PROMPT }, { inlineData: { mimeType, data: imageBase64 } }] }],
-      generationConfig: {
-        temperature: 0,              // Accuracy: deterministic output
-        maxOutputTokens: 4096,
-        responseMimeType: "application/json",  // Speed: no need to parse markdown-wrapped JSON
-      },
-    };
+    const body = bodyBase;
 
     try {
       const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
