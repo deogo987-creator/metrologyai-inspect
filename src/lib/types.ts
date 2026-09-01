@@ -158,6 +158,8 @@ export interface ComplianceResult {
   inspectionSummary: InspectionSummary;
   // Feature 12
   declarationMap: DeclarationMapEntry[];
+  // Deep Rule Compliance (Rule 6,7,8,9,12,13)
+  deepRuleResults?: { id: string; ruleId: string; ruleReference: string; title: string; severity: string; status: string; message: string; remediation?: string; deemedManufacturer?: string }[];
 }
 
 export interface ComplianceCategory {

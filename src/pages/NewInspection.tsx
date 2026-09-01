@@ -58,7 +58,7 @@ import {
   Map,
   ShieldCheck,
   MessageSquare,
-} from "lucide-react";
+Scale,} from "lucide-react";
 
 type Step = 1 | 2 | 3;
 
@@ -301,6 +301,7 @@ export default function NewInspection() {
           detectionStatus: (f.detectionStatus || "detected") as FieldDetectionStatus,
           sourceView: (f.sourceView || "front") as ProductView,
         })),
+        deepRuleResults: (aiResult.deepRuleResults || []).map((d, i) => ({...d, id: `deep-${i}`})),
         violations: aiResult.violations.map((v: { ruleId: string; ruleReference?: string; title: string; severity: "high" | "medium" | "low"; field: string; expected: string; detected: string; evidence: string; explanation: string; recommendation: string; legalReference?: string }, i: number) => ({
           id: `v${i + 1}`,
           ruleReference: v.ruleReference || v.ruleId,
@@ -955,6 +956,48 @@ export default function NewInspection() {
               <p className="mt-1 text-xs text-gray-500">All mandatory declarations appear compliant.</p>
             </div>
           )}
+
+          {/* Deep Rule Compliance (Rule 6,7,8,9,12,13) */}
+          {result.deepRuleResults && result.deepRuleResults.length > 0 && (() => {
+            const nonPass = result.deepRuleResults!.filter(d => d.status !== "PASS");
+            if (nonPass.length === 0) return null;
+            return (
+              <div className="glass-card rounded-2xl p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Scale className="h-4 w-4 text-purple-500" />
+                  <h3 className="text-sm font-bold text-gray-900">Deep Rule Compliance — {nonPass.length} Advanced Check(s)</h3>
+                </div>
+                <div className="space-y-2">
+                  {nonPass.map((d) => {
+                    const statusColors: Record<string, string> = {
+                      VIOLATION: "bg-red-100 text-red-700 border-red-200",
+                      REVIEW: "bg-amber-100 text-amber-700 border-amber-200",
+                      INFO: "bg-blue-100 text-blue-700 border-blue-200",
+                    };
+                    const badgeColors: Record<string, string> = {
+                      VIOLATION: "bg-red-500 text-white",
+                      REVIEW: "bg-amber-500 text-white",
+                      INFO: "bg-blue-500 text-white",
+                    };
+                    return (
+                      <div key={d.id || d.ruleId} className={statusColors[d.status] || "bg-gray-50 border-gray-200"}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={badgeColors[d.status] || "bg-gray-400 text-white"}>{d.status}</span>
+                          <span className="text-[10px] font-bold text-gray-400">{d.ruleReference}</span>
+                          {d.severity === "high" && <span className="px-1.5 py-0.5 rounded bg-red-200 text-red-800 text-[8px] font-bold">HIGH</span>}
+                          {d.severity === "medium" && <span className="px-1.5 py-0.5 rounded bg-amber-200 text-amber-800 text-[8px] font-bold">MEDIUM</span>}
+                        </div>
+                        <p className="text-sm font-bold text-gray-900">{d.title}</p>
+                        <p className="text-xs text-gray-600 mt-1">{d.message}</p>
+                        {d.remediation && <p className="text-[10px] text-gray-500 mt-2 italic">Remediation: {d.remediation}</p>}
+                        {d.deemedManufacturer && <p className="text-[10px] text-blue-600 mt-1 font-bold">Deemed Manufacturer: {d.deemedManufacturer}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Feature 12: Declaration Knowledge Graph */}
           {result.declarationMap.length > 0 && (

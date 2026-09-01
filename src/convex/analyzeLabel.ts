@@ -31,6 +31,22 @@ EXTRACT THESE FIELDS (use "" if not visible on label):
 19. UnitOfMeasure: What unit system is used for net quantity? "SI" (g/kg/ml/L), "non-SI" (oz/lb/gal), or "mixed".
 20. QuantityQualifiers: Are there qualifying words near quantity like "minimum", "not less than", "about", "approximately", "average"? List any found.
 
+DETECTION FIELDS (in addition to the 20 fields above — report as top-level JSON keys, NOT inside the fields object):
+21. dualMRPDetected: true if more than one MRP value is visible on the label (e.g., sticker MRP vs original MRP). false otherwise.
+22. allMRPValues: Array of ALL MRP values visible on the label (e.g., ["₹50", "₹60"]). Empty array if no MRP found.
+23. marketedBy: Extract brand owner name if text contains "Marketed by" or "Mktd by". Empty string if not found.
+24. isStandardUnit: true if net quantity uses SI units (g, kg, ml, L, cm, m, N, U). false if using oz, lb, gal, dozen, pcs, pieces.
+25. contrastEstimate: Estimate contrast of MRP/price text vs background — "high", "medium", or "low".
+26. crowdingEstimate: Estimate how crowded the area around net quantity declaration is — "clear", "moderate", or "crowded".
+27. stickerDetection: Detect stickers on the label. Return object with:
+   - isStickerPresent: boolean
+   - stickerCount: number (0 if none)
+   - stickerTypes: array of "MRP_STICKER", "EXPIRY_STICKER", "OTHER"
+   - isCoveringOriginal: boolean (is any sticker covering original printed text?)
+   - dualMRP: { detected: boolean, allMRPValues: string[], originalMRP: string, stickerMRP: string }
+   - confidence: number (0-100)
+   - visualEvidence: string (describe visual clues: white rectangular sticker, different font quality, edges/shadows, glue marks, misaligned text)
+
 For each field, provide:
 - value: exact text found on label
 - confidence: 0-100 (how certain you are about the extraction)
@@ -51,7 +67,7 @@ COMPLIANCE RULES TO APPLY DURING EXTRACTION:
 Detect anomalies: sticker overlays covering declarations, covered/obscured text, altered MRP patches, typography inconsistencies, image manipulation.
 
 Respond with ONLY valid JSON (no markdown):
-{"fields":{"productName":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"manufacturerName":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"manufacturerAddress":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"netQuantity":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"mrp":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"consumerCareName":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"consumerCareContact":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"consumerCareAddress":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"manufacturingDate":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"expiryDate":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"countryOfOrigin":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"batchNumber":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"vegNonVeg":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"fssaiLicense":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"dimensions":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"mrpTextColor":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"declarationLegibility":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"stickerAlterations":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"unitOfMeasure":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"quantityQualifiers":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""}},"rawText":"","imageQuality":"good","isFoodProduct":false,"anomalies":[],"overallAssessment":""}`;
+{"fields":{"productName":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"manufacturerName":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"manufacturerAddress":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"netQuantity":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"mrp":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"consumerCareName":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"consumerCareContact":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"consumerCareAddress":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"manufacturingDate":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"expiryDate":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"countryOfOrigin":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"batchNumber":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"vegNonVeg":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"fssaiLicense":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"dimensions":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"mrpTextColor":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"declarationLegibility":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"stickerAlterations":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"unitOfMeasure":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""},"quantityQualifiers":{"value":"","confidence":0,"boundingBox":null,"complianceStatus":"compliant","complianceReason":""}},"dualMRPDetected":false,"allMRPValues":[],"marketedBy":"","isStandardUnit":true,"contrastEstimate":"high","crowdingEstimate":"clear","stickerDetection":{"isStickerPresent":false,"stickerCount":0,"stickerTypes":[],"isCoveringOriginal":false,"dualMRP":{"detected":false,"allMRPValues":[],"originalMRP":"","stickerMRP":""},"confidence":0,"visualEvidence":""},"rawText":"","imageQuality":"good","isFoodProduct":false,"anomalies":[],"overallAssessment":""}`;
 
 // ─── TYPES ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +93,22 @@ interface ExtractionResult {
   isFoodProduct: boolean;
   anomalies: AnomalyRaw[];
   overallAssessment: string;
+  // Deep detection fields
+  dualMRPDetected?: boolean;
+  allMRPValues?: string[];
+  marketedBy?: string;
+  isStandardUnit?: boolean;
+  contrastEstimate?: string;
+  crowdingEstimate?: string;
+  stickerDetection?: {
+    isStickerPresent: boolean;
+    stickerCount: number;
+    stickerTypes: string[];
+    isCoveringOriginal: boolean;
+    dualMRP: { detected: boolean; allMRPValues: string[]; originalMRP: string; stickerMRP: string };
+    confidence: number;
+    visualEvidence: string;
+  };
 }
 
 interface FieldStatus {
@@ -143,6 +175,7 @@ interface ComplianceAnalysisResult {
   nextBestActions: NextBestAction[];
   inspectionSummary: { overallStatus: string; keyFindings: string[]; recommendedActions: string[]; riskLevel: string };
   declarationMap: { fieldName: string; ruleId: string; ruleName: string; ruleReference: string; sources: { view: string; imageId: string; ocrText: string; confidence: number }[]; status: string; overallConfidence: number }[];
+  deepRuleResults?: { ruleId: string; ruleReference: string; title: string; severity: string; status: string; message: string; remediation?: string; deemedManufacturer?: string }[];
 }
 
 // ─── ACTUAL LEGAL METROLOGY RULES (Packaged Commodities Rules, 2011) ────────
@@ -777,6 +810,251 @@ function generateViolations(fields: FieldStatus[]): ViolationData[] {
   return violations;
 }
 
+// ─── DEEP RULE CHECK FUNCTIONS — Rule 6(3), 6(1)(a), 12(6), 13, 7/8/9 ──────
+// Additional checks that append to violations without breaking existing flow
+
+interface DeepRuleCheck {
+  ruleId: string;
+  ruleReference: string;
+  title: string;
+  severity: "high" | "medium" | "low";
+  status: "VIOLATION" | "REVIEW" | "INFO" | "PASS";
+  message: string;
+  remediation?: string;
+  deemedManufacturer?: string;
+}
+
+/** Rule 6(3) — MRP Tampering via Stickers */
+function checkRule6_3_MRP_Tampering(
+  dualMRPDetected: boolean,
+  allMRPValues: string[],
+  stickerDetection: ExtractionResult["stickerDetection"]
+): DeepRuleCheck {
+  const sd = stickerDetection;
+  if (
+    dualMRPDetected ||
+    (sd && sd.dualMRP && sd.dualMRP.detected) ||
+    (sd && sd.isStickerPresent && sd.stickerTypes.includes("MRP_STICKER") && sd.isCoveringOriginal)
+  ) {
+    const mrpVals = allMRPValues.length > 0 ? allMRPValues.join(", ") : (sd?.dualMRP?.allMRPValues?.join(", ") || "unknown");
+    return {
+      ruleId: "deep-6-3",
+      ruleReference: "Rule 6(3)",
+      title: "MRP Tampering — Sticker Covering Original MRP",
+      severity: "high",
+      status: "VIOLATION",
+      message: `Dual MRP / Sticker tampering detected. MRP values found: ${mrpVals}. Prohibited under Rule 6(3) — Original MRP must not be covered.`,
+      remediation: "Seize package, check for overwritten MRP sticker. Verify original MRP against manufacturer records."
+    };
+  }
+  return {
+    ruleId: "deep-6-3",
+    ruleReference: "Rule 6(3)",
+    title: "No MRP Tampering Detected",
+    severity: "low",
+    status: "PASS",
+    message: "No sticker tampering detected on MRP declaration."
+  };
+}
+
+/** Rule 6(1)(a) Explanation II — Brand Liability / Deemed Manufacturer */
+function checkRule6_1a_BrandLiability(marketedBy: string): DeepRuleCheck {
+  if (marketedBy && marketedBy.trim().length > 0) {
+    return {
+      ruleId: "deep-6-1a",
+      ruleReference: "Rule 6(1)(a) Expl. II",
+      title: "Brand Owner Identified as Deemed Manufacturer",
+      severity: "low",
+      status: "INFO",
+      message: `Brand Owner "${marketedBy.trim()}" identified as Deemed Manufacturer per Rule 6(1)(a) Explanation II. Brand owner is liable for violations of these rules.`,
+      deemedManufacturer: marketedBy.trim()
+    };
+  }
+  return {
+    ruleId: "deep-6-1a",
+    ruleReference: "Rule 6(1)(a) Expl. II",
+    title: "No Brand Owner (Marketed By) Found",
+    severity: "low",
+    status: "PASS",
+    message: "No 'Marketed by' declaration found on label."
+  };
+}
+
+/** Rule 12(6) — Misleading Quantity Qualifiers */
+function checkRule12_6_MisleadingWords(
+  quantityQualifiers: string,
+  netQuantity: string,
+  rawText: string
+): DeepRuleCheck {
+  const bannedWords = /\b(minimum|min\.|not\s*less\s*than|about|approximately|approx\.|average|avg\.|nearly|circa)\b/gi;
+  const foundWords: string[] = [];
+
+  // Check extracted quantity qualifiers field
+  if (quantityQualifiers) {
+    const matches = quantityQualifiers.match(bannedWords);
+    if (matches) foundWords.push(...matches);
+  }
+
+  // Also check raw OCR text near quantity patterns (within 15 chars)
+  if (foundWords.length === 0 && netQuantity && rawText) {
+    const qtyIdx = rawText.indexOf(netQuantity);
+    if (qtyIdx >= 0) {
+      const surrounding = rawText.substring(Math.max(0, qtyIdx - 15), qtyIdx + netQuantity.length + 15);
+      const nearbyMatches = surrounding.match(bannedWords);
+      if (nearbyMatches) foundWords.push(...nearbyMatches);
+    }
+  }
+
+  if (foundWords.length > 0) {
+    const uniqueWords = [...new Set(foundWords.map(w => w.toLowerCase()))];
+    return {
+      ruleId: "deep-12-6",
+      ruleReference: "Rule 12(6)",
+      title: "Misleading Quantity Qualifier Detected",
+      severity: "high",
+      status: "VIOLATION",
+      message: `Banned qualifier word(s) found near net quantity: "${uniqueWords.join('", "')}". Prohibited under Rule 12(6). Quantity must be absolute without qualifiers.`,
+      remediation: "Remove all qualifying words (minimum, about, approximately, etc.) from net quantity declaration."
+    };
+  }
+  return {
+    ruleId: "deep-12-6",
+    ruleReference: "Rule 12(6)",
+    title: "No Misleading Quantity Qualifiers",
+    severity: "low",
+    status: "PASS",
+    message: "No misleading qualifier words found near net quantity."
+  };
+}
+
+/** Rule 13 — Non-standard Units */
+function checkRule13_BannedUnits(
+  rawText: string,
+  netQuantity: string,
+  isStandardUnit: boolean
+): DeepRuleCheck {
+  const bannedUnitPattern = /\b(doz|dozen|score|gross|great\s*gross|pcs|pieces)\b/gi;
+  let foundUnits: string[] = [];
+
+  if (netQuantity) {
+    const matches = netQuantity.match(bannedUnitPattern);
+    if (matches) foundUnits.push(...matches);
+  }
+  if (foundUnits.length === 0 && rawText) {
+    const matches = rawText.match(bannedUnitPattern);
+    if (matches) foundUnits.push(...matches);
+  }
+
+  if (foundUnits.length > 0 || !isStandardUnit) {
+    const uniqueUnits = [...new Set(foundUnits.map(u => u.toLowerCase()))];
+    return {
+      ruleId: "deep-13",
+      ruleReference: "Rule 13",
+      title: "Non-standard Units Detected",
+      severity: "medium",
+      status: "VIOLATION",
+      message: `Non-standard unit(s) detected: "${uniqueUnits.join('", "')}". Only International System + N/U allowed per Rule 13. Example: "12 pcs" must be "12 U" or "12 N".`,
+      remediation: "Replace non-standard units with SI units. Use 'N' or 'U' for items sold by number."
+    };
+  }
+  return {
+    ruleId: "deep-13",
+    ruleReference: "Rule 13",
+    title: "Standard SI Units Used",
+    severity: "low",
+    status: "PASS",
+    message: "Net quantity uses standard SI units."
+  };
+}
+
+/** Rule 7, 8, 9 — Principal Display Panel & Legibility (Heuristic) */
+function checkRule7_8_9_Prominence(
+  contrastEstimate: string,
+  crowdingEstimate: string
+): DeepRuleCheck[] {
+  const results: DeepRuleCheck[] = [];
+
+  // Rule 9(1)(b) — Contrast
+  if (contrastEstimate === "low") {
+    results.push({
+      ruleId: "deep-9-1b",
+      ruleReference: "Rule 9(1)(b)",
+      title: "Low Contrast on MRP/Quantity Text",
+      severity: "low",
+      status: "REVIEW",
+      message: "MRP/Net Quantity text has low contrast against background — may fail legibility requirement per Rule 9(1)(b).",
+      remediation: "Inspector should verify text is legible in person."
+    });
+  } else {
+    results.push({
+      ruleId: "deep-9-1b",
+      ruleReference: "Rule 9(1)(b)",
+      title: "Contrast Requirement Met",
+      severity: "low",
+      status: "PASS",
+      message: "MRP/Quantity text contrast appears adequate."
+    });
+  }
+
+  // Rule 8 — Free Space around quantity
+  if (crowdingEstimate === "crowded") {
+    results.push({
+      ruleId: "deep-8",
+      ruleReference: "Rule 8",
+      title: "Insufficient Free Space Around Quantity Declaration",
+      severity: "low",
+      status: "REVIEW",
+      message: "Area around net quantity declaration appears crowded. Rule 8 requires free space: equal to numeral height above/below, twice numeral height left/right.",
+      remediation: "Inspector should verify physical clearance around quantity declaration on label."
+    });
+  } else {
+    results.push({
+      ruleId: "deep-8",
+      ruleReference: "Rule 8",
+      title: "Quantity Declaration Space Adequate",
+      severity: "low",
+      status: "PASS",
+      message: "Net quantity declaration area appears adequately spaced."
+    });
+  }
+
+  return results;
+}
+
+/** Run all deep rule checks and return results */
+function runDeepRuleChecks(
+  extraction: ExtractionResult,
+  rawText: string
+): DeepRuleCheck[] {
+  const results: DeepRuleCheck[] = [];
+
+  // Rule 6(3) — MRP Tampering
+  results.push(checkRule6_3_MRP_Tampering(
+    extraction.dualMRPDetected || false,
+    extraction.allMRPValues || [],
+    extraction.stickerDetection
+  ));
+
+  // Rule 6(1)(a) — Brand Liability
+  results.push(checkRule6_1a_BrandLiability(extraction.marketedBy || ""));
+
+  // Rule 12(6) — Misleading Quantity Qualifiers
+  const qtyQual = extraction.fields?.quantityQualifiers?.value || "";
+  const netQty = extraction.fields?.netQuantity?.value || "";
+  results.push(checkRule12_6_MisleadingWords(qtyQual, netQty, rawText));
+
+  // Rule 13 — Banned Units
+  results.push(checkRule13_BannedUnits(rawText, netQty, extraction.isStandardUnit !== false));
+
+  // Rule 7/8/9 — Prominence
+  results.push(...checkRule7_8_9_Prominence(
+    extraction.contrastEstimate || "high",
+    extraction.crowdingEstimate || "clear"
+  ));
+
+  return results;
+}
+
 // ─── SCORING ENGINE — WEIGHTED BY RULE SEVERITY ─────────────────────────────
 
 function calculateScore(fields: FieldStatus[], isFoodProduct: boolean): {
@@ -1266,9 +1544,20 @@ export const analyzeLabel = action({
       status: "detected" as const,
     }));
 
-    const riskPriority = calculateRiskPriority(score, fieldResults, extraction.anomalies || []);
+    // Run deep rule checks (Rule 6(3), 6(1)(a), 12(6), 13, 7/8/9)
+    const deepRuleResults = runDeepRuleChecks(extraction, extraction.rawText || "");
+    const existingRuleRefs = fieldResults.map(f => {
+      const r = LEGAL_RULES[Number(f.ruleId)];
+      return r?.ruleReference || "";
+    });
+    const newDeepViolations = deepRuleResults.filter(r =>
+      r.severity === "high" && r.status === "VIOLATION" && !existingRuleRefs.some(ref => ref.includes(r.ruleReference))
+    );
+    const adjustedScore = Math.max(0, score - newDeepViolations.length * 20);
+
+    const riskPriority = calculateRiskPriority(adjustedScore, fieldResults, extraction.anomalies || []);
     const nextBestActions = generateNextBestActions(fieldResults, violations, extraction.imageQuality || "unknown");
-    const inspectionSummary = generateSummary(status, score, fieldResults, violations, riskPriority.level);
+    const inspectionSummary = generateSummary(status, adjustedScore, fieldResults, violations, riskPriority.level);
 
     // Declaration Map with legal references
     const declarationMap = fieldResults.map(f => {
@@ -1290,10 +1579,11 @@ export const analyzeLabel = action({
     });
 
     return {
-      score, status, fields: fieldResults, violations, categories,
+      score: adjustedScore, status, fields: fieldResults, violations, categories,
       explanation: extraction.overallAssessment ? `${extraction.overallAssessment} ${explanation}` : explanation,
       rawOcrText: extraction.rawText || "", imageQuality: extraction.imageQuality || "unknown", mode: "live",
       imageQualityIssues, recaptureRecommendations, anomalies, riskPriority, nextBestActions, inspectionSummary, declarationMap,
+      deepRuleResults: deepRuleResults.map(r => ({ ...r })),
     };
   },
 });
