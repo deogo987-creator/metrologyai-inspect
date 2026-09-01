@@ -1,0 +1,19 @@
+{
+  "name": "MetrologyAI - Legal Metrology Inspection System",
+  "short_name": "MetrologyAI",
+  "description": "AI-Assisted Legal Metrology Label Compliance Inspection System for Smart India Hackathon PS26034",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0f4ff",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "categories": ["government", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
