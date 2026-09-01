@@ -122,6 +122,7 @@ export interface ExtractedField {
 export interface Violation {
   id: string;
   ruleId: string;
+  ruleReference: string;
   title: string;
   severity: Severity;
   field: string;
@@ -130,6 +131,7 @@ export interface Violation {
   evidence: string;
   explanation: string;
   recommendation: string;
+  legalReference: string;
   evidenceChain?: EvidenceChain;
 }
 

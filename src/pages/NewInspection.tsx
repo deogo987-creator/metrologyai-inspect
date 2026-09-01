@@ -301,8 +301,11 @@ export default function NewInspection() {
           detectionStatus: (f.detectionStatus || "detected") as FieldDetectionStatus,
           sourceView: (f.sourceView || "front") as ProductView,
         })),
-        violations: aiResult.violations.map((v: { ruleId: string; title: string; severity: "high" | "medium" | "low"; field: string; expected: string; detected: string; evidence: string; explanation: string; recommendation: string }, i: number) => ({
-          id: `v${i + 1}`, ...v,
+        violations: aiResult.violations.map((v: { ruleId: string; ruleReference?: string; title: string; severity: "high" | "medium" | "low"; field: string; expected: string; detected: string; evidence: string; explanation: string; recommendation: string; legalReference?: string }, i: number) => ({
+          id: `v${i + 1}`,
+          ruleReference: v.ruleReference || v.ruleId,
+          legalReference: v.legalReference || v.ruleId,
+          ...v,
         })),
         categories: aiResult.categories,
         explanation: aiResult.explanation,
