@@ -58,7 +58,8 @@ import {
   Map,
   ShieldCheck,
   MessageSquare,
-Scale,} from "lucide-react";
+Scale,
+Tag,} from "lucide-react";
 
 type Step = 1 | 2 | 3;
 
@@ -302,6 +303,8 @@ export default function NewInspection() {
           sourceView: (f.sourceView || "front") as ProductView,
         })),
         deepRuleResults: (aiResult.deepRuleResults || []).map((d, i) => ({...d, id: `deep-${i}`})),
+        commodityInfo: aiResult.commodityInfo || undefined,
+        mrpCurrency: aiResult.mrpCurrency || undefined,
         violations: aiResult.violations.map((v: { ruleId: string; ruleReference?: string; title: string; severity: "high" | "medium" | "low"; field: string; expected: string; detected: string; evidence: string; explanation: string; recommendation: string; legalReference?: string }, i: number) => ({
           id: `v${i + 1}`,
           ruleReference: v.ruleReference || v.ruleId,
@@ -954,6 +957,65 @@ export default function NewInspection() {
               <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
               <p className="mt-3 text-sm font-bold text-gray-900">No Violations Detected</p>
               <p className="mt-1 text-xs text-gray-500">All mandatory declarations appear compliant.</p>
+            </div>
+          )}
+
+          {/* Commodity-Aware Rule Engine */}
+          {result.commodityInfo && (
+            <div className="glass-card rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Tag className="h-4 w-4 text-indigo-500" />
+                <h3 className="text-sm font-bold text-gray-900">Commodity Identification</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="rounded-lg bg-indigo-50/80 border border-indigo-100 p-3">
+                    <p className="text-[10px] font-bold text-indigo-600 uppercase">Detected Category</p>
+                    <p className="text-sm font-bold text-gray-900 mt-1">{result.commodityInfo.displayName}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">{result.commodityInfo.description}</p>
+                  </div>
+                  {result.commodityInfo.exemptionsApplied.length > 0 && (
+                    <div className="rounded-lg bg-amber-50/80 border border-amber-100 p-3">
+                      <p className="text-[10px] font-bold text-amber-600 uppercase">Exceptions Applied</p>
+                      {result.commodityInfo.exemptionsApplied.map((ex, i) => (
+                        <p key={i} className="text-[10px] text-amber-700 mt-1">Rule {ex.ruleId}: {ex.reason}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-lg bg-gray-50/80 border border-gray-100 p-3">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Rules Checked</p>
+                  <div className="flex flex-wrap gap-1">
+                    {result.commodityInfo.applicableRuleIds.map(ruleId => (
+                      <span key={ruleId} className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[9px] font-mono">R{ruleId}</span>
+                    ))}
+                  </div>
+                  {result.commodityInfo.skippedRules.length > 0 && (
+                    <>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 mb-1">Skipped (Not Applicable)</p>
+                      <div className="flex flex-wrap gap-1">
+                        {result.commodityInfo.skippedRules.map(ruleId => (
+                          <span key={ruleId} className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-[9px] font-mono line-through">R{ruleId}</span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MRP Currency Validation */}
+          {result.mrpCurrency && !result.mrpCurrency.detected && result.mrpCurrency.issue && (
+            <div className="glass-card rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-bold text-gray-900">MRP Currency Notation Issue</h3>
+              </div>
+              <div className="rounded-lg bg-amber-50/80 border border-amber-100 p-3">
+                <p className="text-xs text-amber-700">{result.mrpCurrency.issue}</p>
+                <p className="text-[10px] text-gray-500 mt-1">Rule 6(1)(e) requires explicit currency notation on the price declaration.</p>
+              </div>
             </div>
           )}
 

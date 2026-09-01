@@ -160,6 +160,17 @@ export interface ComplianceResult {
   declarationMap: DeclarationMapEntry[];
   // Deep Rule Compliance (Rule 6,7,8,9,12,13)
   deepRuleResults?: { id: string; ruleId: string; ruleReference: string; title: string; severity: string; status: string; message: string; remediation?: string; deemedManufacturer?: string }[];
+  // Commodity-Aware Rule Engine
+  commodityInfo?: {
+    category: string;
+    displayName: string;
+    description: string;
+    applicableRuleIds: number[];
+    exemptionsApplied: { ruleId: number; reason: string }[];
+    skippedRules: number[];
+    additionalFields: string[];
+  };
+  mrpCurrency?: { detected: boolean; notation: string; issue?: string; confidence: number };
 }
 
 export interface ComplianceCategory {
